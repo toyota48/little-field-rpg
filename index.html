@@ -33,15 +33,24 @@
               <button class="touch-button dpad-down" type="button" data-move="down" aria-label="下へ移動">▼</button>
             </div>
             <div id="touchBattleStatus" class="touch-battle-status" aria-live="polite" hidden>
-              <span id="touchHpText">HP 30 / 30</span>
-              <div class="touch-hp-meter" aria-hidden="true">
-                <span id="touchHpBar"></span>
+              <div>
+                <span id="touchHpText">HP 30 / 30</span>
+                <div class="touch-meter touch-hp-meter" aria-hidden="true">
+                  <span id="touchHpBar"></span>
+                </div>
+              </div>
+              <div>
+                <span id="touchMpText">MP 10 / 10</span>
+                <div class="touch-meter touch-mp-meter" aria-hidden="true">
+                  <span id="touchMpBar"></span>
+                </div>
               </div>
             </div>
             <button id="touchInteractButton" class="touch-button touch-action" type="button">決定</button>
             <div id="battleTouchMenu" class="battle-touch-menu" hidden>
               <button id="touchAttackButton" class="battle-command" type="button">攻撃</button>
-              <button id="touchHealButton" class="battle-command" type="button">回復</button>
+              <button id="touchHealButton" class="battle-command" type="button">まほう</button>
+              <button id="touchItemButton" class="battle-command" type="button">どうぐ</button>
               <button id="touchRunButton" class="battle-command" type="button">逃げる</button>
             </div>
           </section>
@@ -71,12 +80,23 @@
                 <dt>お金</dt>
                 <dd><span id="goldValue">0</span> G</dd>
               </div>
+              <div>
+                <dt>薬草</dt>
+                <dd><span id="herbValue">1</span> 個</dd>
+              </div>
             </dl>
 
             <div class="meter-row">
               <span id="hpText">HP 30 / 30</span>
               <div class="meter hp-meter" aria-hidden="true">
                 <span id="hpBar"></span>
+              </div>
+            </div>
+
+            <div class="meter-row">
+              <span id="mpText">MP 10 / 10</span>
+              <div class="meter mp-meter" aria-hidden="true">
+                <span id="mpBar"></span>
               </div>
             </div>
 
@@ -103,7 +123,8 @@
             <div class="command-grid">
               <button id="interactButton" type="button">決定</button>
               <button id="attackButton" type="button">攻撃</button>
-              <button id="healButton" type="button">回復</button>
+              <button id="healButton" type="button">まほう</button>
+              <button id="itemButton" type="button">どうぐ</button>
               <button id="runButton" type="button">逃げる</button>
             </div>
           </section>

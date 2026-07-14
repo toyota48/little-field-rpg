@@ -217,7 +217,12 @@ h2 {
   display: none !important;
 }
 
-.touch-hp-meter {
+.touch-battle-status > div {
+  display: grid;
+  gap: 6px;
+}
+
+.touch-meter {
   position: relative;
   width: 100%;
   height: 12px;
@@ -227,18 +232,25 @@ h2 {
   background: #ded8ca;
 }
 
-.touch-hp-meter span {
+.touch-meter span {
   display: block;
   width: 0%;
   height: 100%;
   border-radius: inherit;
-  background: var(--danger);
   transition: width 160ms ease;
+}
+
+.touch-hp-meter span {
+  background: var(--danger);
+}
+
+.touch-mp-meter span {
+  background: #4a76c6;
 }
 
 .battle-touch-menu {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
 }
@@ -345,6 +357,10 @@ dd {
   background: var(--danger);
 }
 
+.mp-meter span {
+  background: #4a76c6;
+}
+
 .exp-meter span {
   background: var(--gold);
 }
@@ -436,7 +452,7 @@ dd {
     box-shadow: none;
     padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
     align-content: start;
-    background: var(--panel);
+    background: #111318;
   }
 
   body.battle-focus #gameCanvas {
@@ -457,13 +473,14 @@ dd {
 
   body.battle-focus .touch-battle-status {
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;
     width: 100%;
     padding: 12px 14px;
-    border: 1px solid #dfd1b9;
+    border: 2px solid #fffaf1;
     border-radius: 8px;
-    background: #fffdf8;
-    color: var(--ink);
+    background: #15191f;
+    color: #fffaf1;
     font-weight: 800;
   }
 
@@ -471,6 +488,8 @@ dd {
     width: 100%;
     min-height: 64px;
     justify-self: stretch;
+    border-color: #fffaf1;
+    background: #24312f;
   }
 }
 
@@ -505,6 +524,6 @@ dd {
   }
 
   body.battle-focus .battle-touch-menu {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -6,6 +6,8 @@
   const MAP_ROWS = 12;
   const SAVE_KEY = "little-field-rpg-save-v1";
   const INN_PRICE = 6;
+  const HEAL_MAGIC_COST = 4;
+  const HERB_HEAL = 18;
   const EFFECT_DURATIONS = {
     slash: 360,
     enemyAttack: 420,
@@ -27,8 +29,11 @@
     levelValue: document.getElementById("levelValue"),
     attackValue: document.getElementById("attackValue"),
     goldValue: document.getElementById("goldValue"),
+    herbValue: document.getElementById("herbValue"),
     hpText: document.getElementById("hpText"),
     hpBar: document.getElementById("hpBar"),
+    mpText: document.getElementById("mpText"),
+    mpBar: document.getElementById("mpBar"),
     expText: document.getElementById("expText"),
     expBar: document.getElementById("expBar"),
     enemyPanel: document.getElementById("enemyPanel"),
@@ -39,6 +44,7 @@
     interactButton: document.getElementById("interactButton"),
     attackButton: document.getElementById("attackButton"),
     healButton: document.getElementById("healButton"),
+    itemButton: document.getElementById("itemButton"),
     runButton: document.getElementById("runButton"),
     saveButton: document.getElementById("saveButton"),
     loadButton: document.getElementById("loadButton"),
@@ -48,9 +54,12 @@
     touchBattleStatus: document.getElementById("touchBattleStatus"),
     touchHpText: document.getElementById("touchHpText"),
     touchHpBar: document.getElementById("touchHpBar"),
+    touchMpText: document.getElementById("touchMpText"),
+    touchMpBar: document.getElementById("touchMpBar"),
     battleTouchMenu: document.getElementById("battleTouchMenu"),
     touchAttackButton: document.getElementById("touchAttackButton"),
     touchHealButton: document.getElementById("touchHealButton"),
+    touchItemButton: document.getElementById("touchItemButton"),
     touchRunButton: document.getElementById("touchRunButton"),
   };
 
@@ -146,14 +155,24 @@
           message: "町に戻った。",
         },
       ],
-      entities: [],
+      entities: [
+        {
+          id: "grassland-cache",
+          kind: "chest",
+          name: "宝箱",
+          x: 13,
+          y: 6,
+          contents: { herb: 2, gold: 12 },
+        },
+      ],
     },
   };
 
   const ENEMIES = [
-    { name: "スライム", maxHp: 18, attack: 4, exp: 6, gold: 4, color: "#58a45c" },
-    { name: "ウルフ", maxHp: 24, attack: 6, exp: 10, gold: 7, color: "#6d6f7a" },
-    { name: "ワスプ", maxHp: 16, attack: 7, exp: 9, gold: 6, color: "#d1a737" },
+    { name: "スライム", maxHp: 18, attack: 4, exp: 6, gold: 4, color: "#58a45c", sprite: "slime" },
+    { name: "ウルフ", maxHp: 24, attack: 6, exp: 10, gold: 7, color: "#6d6f7a", sprite: "wolf" },
+    { name: "ワスプ", maxHp: 16, attack: 7, exp: 9, gold: 6, color: "#d1a737", sprite: "wasp" },
+    { name: "まよいび", maxHp: 20, attack: 5, exp: 8, gold: 8, color: "#6a8bd6", sprite: "spirit" },
   ];
 
   const DIRECTIONS = {
@@ -198,12 +217,18 @@
         level: 1,
         hp: 30,
         maxHp: 30,
+        mp: 10,
+        maxMp: 10,
         attack: 6,
         exp: 0,
         nextExp: 12,
         gold: 0,
+        inventory: {
+          herb: 1,
+        },
       },
       npcTalkIndex: {},
+      openedChests: {},
       log: ["町の南から草原へ向かえる。"],
       steps: 0,
     };
@@ -274,6 +299,23 @@
 
   function choose(list) {
     return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function ensureInventory(player = state.player) {
+    if (!player.inventory) {
+      player.inventory = {};
+    }
+
+    player.inventory.herb = Math.max(0, Number(player.inventory.herb) || 0);
+    return player.inventory;
+  }
+
+  function getHerbCount() {
+    return ensureInventory().herb;
+  }
+
+  function isChestOpen(chest) {
+    return Boolean(state.openedChests[chest.id]);
   }
 
   function movePlayer(deltaX, deltaY) {
@@ -355,11 +397,17 @@
     if (entity.kind === "inn") {
       stayAtInn();
       render();
+      return;
+    }
+
+    if (entity.kind === "chest") {
+      openChest(entity);
+      render();
     }
   }
 
   function stayAtInn() {
-    if (state.player.hp === state.player.maxHp) {
+    if (state.player.hp === state.player.maxHp && state.player.mp === state.player.maxMp) {
       addLog("宿屋「もう元気いっぱいですね。」");
       return;
     }
@@ -371,7 +419,33 @@
 
     state.player.gold -= INN_PRICE;
     state.player.hp = state.player.maxHp;
-    addLog(`宿屋に泊まった。HPが全回復した。-${INN_PRICE}G`);
+    state.player.mp = state.player.maxMp;
+    addLog(`宿屋に泊まった。HPとMPが全回復した。-${INN_PRICE}G`);
+  }
+
+  function openChest(chest) {
+    if (isChestOpen(chest)) {
+      addLog("宝箱は空っぽだ。");
+      return;
+    }
+
+    const inventory = ensureInventory();
+    const herb = chest.contents.herb || 0;
+    const gold = chest.contents.gold || 0;
+    inventory.herb += herb;
+    state.player.gold += gold;
+    state.openedChests[chest.id] = true;
+    playItemSound();
+
+    const rewards = [];
+    if (herb > 0) {
+      rewards.push(`薬草${herb}個`);
+    }
+    if (gold > 0) {
+      rewards.push(`${gold}G`);
+    }
+
+    addLog(`宝箱を開けた。${rewards.join(" と ")}を手に入れた。`);
   }
 
   function startBattle(enemyTemplate) {
@@ -427,16 +501,67 @@
       return;
     }
 
+    if (state.player.hp === state.player.maxHp) {
+      addLog("HPは満タンだ。");
+      render();
+      return;
+    }
+
+    if (state.player.mp < HEAL_MAGIC_COST) {
+      addLog("MPが足りない。");
+      render();
+      return;
+    }
+
     battleCommandOpen = false;
     setBattleBusy(true);
 
     try {
       const healAmount = 10 + state.player.level * 4;
       const before = state.player.hp;
+      state.player.mp = clamp(state.player.mp - HEAL_MAGIC_COST, 0, state.player.maxMp);
       state.player.hp = clamp(state.player.hp + healAmount, 0, state.player.maxHp);
       const recovered = state.player.hp - before;
-      addLog(`回復した。HPが${recovered}回復。`);
+      addLog(`回復のまほうを唱えた。HPが${recovered}回復。`);
       playHealSound();
+      await playEffect({ type: "heal", amount: recovered }, EFFECT_DURATIONS.heal);
+      await wait(180);
+      await enemyTurn();
+    } finally {
+      if (state.mode === "battle" && state.battle) {
+        setBattleBusy(false);
+      }
+    }
+  }
+
+  async function playerUseHerb() {
+    if (state.mode !== "battle" || isBattleBusy()) {
+      return;
+    }
+
+    const inventory = ensureInventory();
+    if (inventory.herb <= 0) {
+      addLog("薬草を持っていない。");
+      render();
+      return;
+    }
+
+    if (state.player.hp === state.player.maxHp) {
+      addLog("HPは満タンだ。");
+      render();
+      return;
+    }
+
+    battleCommandOpen = false;
+    setBattleBusy(true);
+
+    try {
+      const before = state.player.hp;
+      inventory.herb -= 1;
+      state.player.hp = clamp(state.player.hp + HERB_HEAL, 0, state.player.maxHp);
+      const recovered = state.player.hp - before;
+      addLog(`薬草を使った。HPが${recovered}回復。`);
+      playItemSound();
       await playEffect({ type: "heal", amount: recovered }, EFFECT_DURATIONS.heal);
       await wait(180);
       await enemyTurn();
@@ -519,9 +644,11 @@
       state.player.exp -= state.player.nextExp;
       state.player.level += 1;
       state.player.maxHp += 8 + state.player.level;
+      state.player.maxMp += 3 + Math.floor(state.player.level / 2);
       state.player.attack += 2;
       state.player.nextExp = Math.floor(state.player.nextExp * 1.45 + 6);
       state.player.hp = state.player.maxHp;
+      state.player.mp = state.player.maxMp;
       didLevelUp = true;
       addLog(`レベルアップ。Lv${state.player.level}になった。`);
     }
@@ -624,6 +751,11 @@
     playTone(860, 0.19, 0.18, "sine", 0.05);
   }
 
+  function playItemSound() {
+    playTone(660, 0, 0.07, "square", 0.04);
+    playTone(880, 0.08, 0.08, "square", 0.045);
+  }
+
   function playRunSound() {
     playTone(260, 0, 0.06, "triangle", 0.05);
     playTone(210, 0.08, 0.06, "triangle", 0.04);
@@ -646,6 +778,7 @@
     const lostGold = Math.floor(state.player.gold / 2);
     state.player.gold -= lostGold;
     state.player.hp = state.player.maxHp;
+    state.player.mp = state.player.maxMp;
     state.mapId = "town";
     state.player.x = 7;
     state.player.y = 10;
@@ -664,11 +797,12 @@
     }
 
     const payload = {
-      version: 1,
+      version: 2,
       savedAt: new Date().toISOString(),
       mapId: state.mapId,
       player: state.player,
       npcTalkIndex: state.npcTalkIndex,
+      openedChests: state.openedChests,
       log: state.log,
       steps: state.steps,
     };
@@ -702,6 +836,13 @@
       return;
     }
 
+    const loadedMaxMp = Number.isFinite(payload.player.maxMp) ? payload.player.maxMp : 10;
+    const loadedMp = Number.isFinite(payload.player.mp) ? payload.player.mp : loadedMaxMp;
+    const savedHerb = payload.player.inventory?.herb;
+    const loadedInventory = {
+      herb: Number.isFinite(savedHerb) ? Math.max(0, savedHerb) : 1,
+    };
+
     state = {
       mapId: payload.mapId,
       mode: "explore",
@@ -712,12 +853,16 @@
         level: payload.player.level,
         hp: clamp(payload.player.hp, 1, payload.player.maxHp),
         maxHp: payload.player.maxHp,
+        mp: clamp(loadedMp, 0, loadedMaxMp),
+        maxMp: loadedMaxMp,
         attack: payload.player.attack,
         exp: payload.player.exp,
         nextExp: payload.player.nextExp,
         gold: payload.player.gold,
+        inventory: loadedInventory,
       },
       npcTalkIndex: payload.npcTalkIndex || {},
+      openedChests: payload.openedChests || {},
       log: Array.isArray(payload.log) ? payload.log.slice(0, 8) : ["ロードした。"],
       steps: payload.steps || 0,
     };
@@ -728,7 +873,7 @@
   }
 
   function isValidSave(payload) {
-    if (!payload || payload.version !== 1) {
+    if (!payload || ![1, 2].includes(payload.version)) {
       return false;
     }
 
@@ -743,6 +888,8 @@
       player.level,
       player.hp,
       player.maxHp,
+      Number.isFinite(player.mp) ? player.mp : 0,
+      Number.isFinite(player.maxMp) ? player.maxMp : 10,
       player.attack,
       player.exp,
       player.nextExp,
@@ -859,8 +1006,36 @@
   }
 
   function drawEntity(entity) {
+    if (entity.kind === "chest") {
+      drawChest(entity);
+      drawNameplate(isChestOpen(entity) ? "空" : entity.name, entity.x, entity.y);
+      return;
+    }
+
     drawCharacter(entity.x, entity.y, entity.body, entity.hair);
     drawNameplate(entity.name, entity.x, entity.y);
+  }
+
+  function drawChest(chest) {
+    const px = chest.x * TILE_SIZE;
+    const py = chest.y * TILE_SIZE;
+    const opened = isChestOpen(chest);
+
+    ctx.fillStyle = "rgba(35, 45, 38, 0.22)";
+    ctx.fillRect(px + 6, py + 25, 20, 4);
+    ctx.fillStyle = opened ? "#7a5637" : "#9a6237";
+    ctx.fillRect(px + 6, py + 13, 20, 14);
+    ctx.fillStyle = opened ? "#d7ba7a" : "#f0c05a";
+    ctx.fillRect(px + 6, py + 13, 20, 4);
+    ctx.fillStyle = "#4d3326";
+    ctx.fillRect(px + 14, py + 17, 4, 5);
+
+    if (opened) {
+      ctx.fillStyle = "#3a2720";
+      ctx.fillRect(px + 6, py + 8, 20, 7);
+      ctx.fillStyle = "#c9ad79";
+      ctx.fillRect(px + 8, py + 9, 16, 3);
+    }
   }
 
   function drawPlayer(x, y) {
@@ -906,42 +1081,160 @@
     const battleShake = effect?.type === "enemyAttack"
       ? Math.sin(effect.progress * Math.PI * 12) * 7 * (1 - effect.progress)
       : 0;
-
-    ctx.fillStyle = "rgba(27, 28, 30, 0.62)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     const centerX = canvas.width / 2 + battleShake;
-    const centerY = canvas.height / 2;
+    const enemyY = 142;
     const enemyJolt = effect?.type === "slash"
       ? Math.sin(effect.progress * Math.PI) * 7
       : 0;
     const enemyAlpha = effect?.type === "defeat" ? 1 - effect.progress : 1;
 
-    ctx.fillStyle = "rgba(255, 250, 241, 0.96)";
-    roundRect(centerX - 150, centerY - 116, 300, 220, 8);
-    ctx.fill();
+    ctx.fillStyle = "#111318";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#1a1f27";
+    ctx.fillRect(0, 0, canvas.width, 236);
+    ctx.fillStyle = "#253142";
+    for (let index = 0; index < 36; index += 1) {
+      const x = (index * 43) % canvas.width;
+      const y = 12 + ((index * 37) % 172);
+      ctx.fillRect(x, y, 2, 2);
+    }
+
+    drawRetroWindow(18, 16, 176, 58);
+    ctx.fillStyle = "#fffaf1";
+    ctx.font = "bold 17px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(enemy.name, 36, 42);
+    ctx.font = "14px sans-serif";
+    ctx.fillText(`HP ${enemy.hp} / ${enemy.maxHp}`, 36, 62);
 
     ctx.save();
     ctx.globalAlpha = enemyAlpha;
     ctx.translate(enemyJolt, 0);
-    ctx.fillStyle = enemy.color;
-    ctx.fillRect(centerX - 44, centerY - 58, 88, 70);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
-    ctx.fillRect(centerX - 30, centerY - 44, 20, 15);
-    ctx.fillStyle = "#1f2326";
-    ctx.fillRect(centerX - 20, centerY - 24, 6, 6);
-    ctx.fillRect(centerX + 14, centerY - 24, 6, 6);
+    drawEnemySprite(enemy, centerX, enemyY);
     ctx.restore();
 
-    ctx.fillStyle = "#24312f";
-    ctx.font = "bold 22px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(enemy.name, centerX, centerY + 48);
-    ctx.font = "16px sans-serif";
-    ctx.fillText(`HP ${enemy.hp} / ${enemy.maxHp}`, centerX, centerY + 76);
-
     if (effect) {
-      drawBattleEffect(effect, centerX, centerY);
+      drawBattleEffect(effect, centerX, enemyY);
+    }
+
+    drawBattleMessage(state.log[0] || "どうする？");
+    drawBattleCommandWindow();
+  }
+
+  function drawEnemySprite(enemy, centerX, centerY) {
+    if (enemy.sprite === "wolf") {
+      drawWolfSprite(enemy, centerX, centerY);
+    } else if (enemy.sprite === "wasp") {
+      drawWaspSprite(enemy, centerX, centerY);
+    } else if (enemy.sprite === "spirit") {
+      drawSpiritSprite(enemy, centerX, centerY);
+    } else {
+      drawSlimeSprite(enemy, centerX, centerY);
+    }
+  }
+
+  function drawSlimeSprite(enemy, centerX, centerY) {
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(centerX - 48, centerY - 18, 96, 50);
+    ctx.fillRect(centerX - 32, centerY - 38, 64, 22);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+    ctx.fillRect(centerX - 28, centerY - 25, 18, 12);
+    ctx.fillStyle = "#15191f";
+    ctx.fillRect(centerX - 22, centerY, 7, 7);
+    ctx.fillRect(centerX + 15, centerY, 7, 7);
+    ctx.fillRect(centerX - 11, centerY + 18, 22, 4);
+  }
+
+  function drawWolfSprite(enemy, centerX, centerY) {
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(centerX - 52, centerY - 18, 104, 48);
+    ctx.fillRect(centerX - 38, centerY - 50, 76, 38);
+    ctx.fillRect(centerX - 44, centerY - 66, 18, 24);
+    ctx.fillRect(centerX + 26, centerY - 66, 18, 24);
+    ctx.fillStyle = "#e6e0d1";
+    ctx.fillRect(centerX - 24, centerY - 36, 48, 26);
+    ctx.fillStyle = "#15191f";
+    ctx.fillRect(centerX - 22, centerY - 31, 6, 6);
+    ctx.fillRect(centerX + 16, centerY - 31, 6, 6);
+    ctx.fillRect(centerX - 5, centerY - 20, 10, 5);
+  }
+
+  function drawWaspSprite(enemy, centerX, centerY) {
+    ctx.fillStyle = "rgba(223, 239, 255, 0.72)";
+    ctx.fillRect(centerX - 58, centerY - 48, 42, 34);
+    ctx.fillRect(centerX + 16, centerY - 48, 42, 34);
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(centerX - 34, centerY - 24, 68, 58);
+    ctx.fillStyle = "#392d23";
+    ctx.fillRect(centerX - 34, centerY - 9, 68, 8);
+    ctx.fillRect(centerX - 34, centerY + 12, 68, 8);
+    ctx.fillStyle = "#15191f";
+    ctx.fillRect(centerX - 18, centerY - 14, 6, 6);
+    ctx.fillRect(centerX + 12, centerY - 14, 6, 6);
+  }
+
+  function drawSpiritSprite(enemy, centerX, centerY) {
+    const floatY = Math.sin(performance.now() / 180) * 5;
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(centerX - 36, centerY - 45 + floatY, 72, 76);
+    ctx.fillRect(centerX - 24, centerY - 61 + floatY, 48, 20);
+    ctx.fillStyle = "#dfe9ff";
+    ctx.fillRect(centerX - 20, centerY - 24 + floatY, 10, 10);
+    ctx.fillRect(centerX + 10, centerY - 24 + floatY, 10, 10);
+    ctx.fillStyle = "#15191f";
+    ctx.fillRect(centerX - 17, centerY - 21 + floatY, 4, 4);
+    ctx.fillRect(centerX + 13, centerY - 21 + floatY, 4, 4);
+    ctx.fillStyle = "#111318";
+    ctx.fillRect(centerX - 36, centerY + 25 + floatY, 12, 14);
+    ctx.fillRect(centerX - 6, centerY + 25 + floatY, 12, 14);
+    ctx.fillRect(centerX + 24, centerY + 25 + floatY, 12, 14);
+  }
+
+  function drawBattleMessage(text) {
+    drawRetroWindow(18, 268, 316, 92);
+    ctx.fillStyle = "#fffaf1";
+    ctx.font = "bold 16px sans-serif";
+    ctx.textAlign = "left";
+    wrapText(text, 36, 302, 280, 22);
+  }
+
+  function drawBattleCommandWindow() {
+    drawRetroWindow(348, 268, 146, 92);
+    ctx.fillStyle = "#fffaf1";
+    ctx.font = "bold 15px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("たたかう", 370, 298);
+    ctx.fillText("まほう", 370, 324);
+    ctx.fillText("どうぐ", 430, 298);
+    ctx.fillText("にげる", 430, 324);
+  }
+
+  function drawRetroWindow(x, y, width, height) {
+    ctx.fillStyle = "#15191f";
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeStyle = "#fffaf1";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x + 1.5, y + 1.5, width - 3, height - 3);
+  }
+
+  function wrapText(text, x, y, maxWidth, lineHeight) {
+    let line = "";
+    let lineY = y;
+
+    [...text].forEach((character) => {
+      const testLine = line + character;
+      if (ctx.measureText(testLine).width > maxWidth && line) {
+        ctx.fillText(line, x, lineY);
+        line = character;
+        lineY += lineHeight;
+        return;
+      }
+      line = testLine;
+    });
+
+    if (line) {
+      ctx.fillText(line, x, lineY);
     }
   }
 
@@ -1121,7 +1414,9 @@
     const busy = isBattleBusy();
     const isBattle = state.mode === "battle";
     const hpRatio = (player.hp / player.maxHp) * 100;
+    const mpRatio = (player.mp / player.maxMp) * 100;
     const expRatio = (player.exp / player.nextExp) * 100;
+    const herbCount = getHerbCount();
 
     document.body.classList.toggle("battle-focus", isBattle);
     ui.mapValue.textContent = currentMap().name;
@@ -1130,10 +1425,15 @@
     ui.levelValue.textContent = player.level;
     ui.attackValue.textContent = player.attack;
     ui.goldValue.textContent = player.gold;
+    ui.herbValue.textContent = herbCount;
     ui.hpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
     ui.hpBar.style.width = `${hpRatio}%`;
     ui.touchHpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
     ui.touchHpBar.style.width = `${hpRatio}%`;
+    ui.mpText.textContent = `MP ${player.mp} / ${player.maxMp}`;
+    ui.mpBar.style.width = `${mpRatio}%`;
+    ui.touchMpText.textContent = `MP ${player.mp} / ${player.maxMp}`;
+    ui.touchMpBar.style.width = `${mpRatio}%`;
     ui.expText.textContent = `EXP ${player.exp} / ${player.nextExp}`;
     ui.expBar.style.width = `${expRatio}%`;
 
@@ -1146,7 +1446,8 @@
 
     ui.interactButton.disabled = state.mode !== "explore" || busy;
     ui.attackButton.disabled = !isBattle || busy;
-    ui.healButton.disabled = !isBattle || busy;
+    ui.healButton.disabled = !isBattle || busy || player.mp < HEAL_MAGIC_COST;
+    ui.itemButton.disabled = !isBattle || busy || herbCount <= 0;
     ui.runButton.disabled = !isBattle || busy;
     ui.saveButton.disabled = isBattle || busy;
     ui.loadButton.disabled = busy;
@@ -1156,7 +1457,8 @@
     ui.touchInteractButton.disabled = busy || (!isBattle && state.mode !== "explore");
     ui.battleTouchMenu.hidden = !isBattle || !battleCommandOpen || busy;
     ui.touchAttackButton.disabled = !isBattle || busy;
-    ui.touchHealButton.disabled = !isBattle || busy;
+    ui.touchHealButton.disabled = !isBattle || busy || player.mp < HEAL_MAGIC_COST;
+    ui.touchItemButton.disabled = !isBattle || busy || herbCount <= 0;
     ui.touchRunButton.disabled = !isBattle || busy;
     ui.touchMoveButtons.forEach((button) => {
       button.disabled = state.mode !== "explore" || busy;
@@ -1187,6 +1489,8 @@
       } else if (event.key === "2") {
         playerHeal();
       } else if (event.key === "3") {
+        playerUseHerb();
+      } else if (event.key === "4") {
         playerRun();
       }
       return;
@@ -1266,6 +1570,7 @@
     ui.interactButton.addEventListener("click", interact);
     ui.attackButton.addEventListener("click", playerAttack);
     ui.healButton.addEventListener("click", playerHeal);
+    ui.itemButton.addEventListener("click", playerUseHerb);
     ui.runButton.addEventListener("click", playerRun);
     ui.saveButton.addEventListener("click", saveGame);
     ui.loadButton.addEventListener("click", loadGame);
@@ -1273,6 +1578,7 @@
     ui.touchInteractButton.addEventListener("click", handleTouchAction);
     ui.touchAttackButton.addEventListener("click", playerAttack);
     ui.touchHealButton.addEventListener("click", playerHeal);
+    ui.touchItemButton.addEventListener("click", playerUseHerb);
     ui.touchRunButton.addEventListener("click", playerRun);
     ui.touchMoveButtons.forEach((button) => {
       button.addEventListener("pointerdown", handleTouchMoveStart);
