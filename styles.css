@@ -470,6 +470,15 @@ body.battle-focus .battle-command.guided-command {
   background: #fffdf8;
 }
 
+.stats-grid .equipment-stat {
+  grid-column: 1 / -1;
+}
+
+.equipment-stat dd {
+  white-space: normal;
+  line-height: 1.45;
+}
+
 dt {
   color: var(--muted);
   font-size: 0.74rem;

@@ -5,10 +5,12 @@
   const MAP_COLS = 16;
   const MAP_ROWS = 12;
   const SAVE_KEY = "little-field-rpg-save-v1";
-  const SAVE_VERSION = 4;
+  const SAVE_VERSION = 5;
   const INN_PRICE = 5;
   const HEAL_MAGIC_COST = 3;
   const FULL_SLASH_COST = 3;
+  const TOUCH_HOLD_INITIAL_DELAY = 220;
+  const TOUCH_HOLD_REPEAT_DELAY = 145;
   const HERB_HEAL = 18;
   const EFFECT_DURATIONS = {
     slash: 360,
@@ -19,19 +21,103 @@
   };
   const BATTLE_ACTION_DETAILS = {
     fullSlash: {
+      category: "skill",
       name: "全力斬り",
       costLabel: `MP${FULL_SLASH_COST}`,
+      mpCost: FULL_SLASH_COST,
+      minLevel: 1,
+      attackMultiplier: 1.5,
       description: "全力を尽くして切りかかる。対象に小ダメージ",
     },
+    doubleSlash: {
+      category: "skill",
+      name: "二段斬り",
+      costLabel: "MP5",
+      mpCost: 5,
+      minLevel: 4,
+      attackMultiplier: 1.9,
+      description: "素早く二度切りつける。対象に中ダメージ",
+    },
+    helmSplitter: {
+      category: "skill",
+      name: "かぶと割り",
+      costLabel: "MP7",
+      mpCost: 7,
+      minLevel: 7,
+      attackMultiplier: 2.25,
+      description: "守りを砕く一撃。対象に大きめのダメージ",
+    },
     heal: {
+      category: "magic",
       name: "回復",
       costLabel: `MP${HEAL_MAGIC_COST}`,
+      mpCost: HEAL_MAGIC_COST,
+      minLevel: 1,
+      effect: "heal",
+      healMultiplier: 1,
       description: "初級回復魔法。少量のHPを回復する。",
     },
+    fire: {
+      category: "magic",
+      name: "メラ",
+      costLabel: "MP4",
+      mpCost: 4,
+      minLevel: 3,
+      effect: "damage",
+      power: 18,
+      description: "小さな火球を放つ。対象に小ダメージ",
+    },
+    midHeal: {
+      category: "magic",
+      name: "ベホイミ",
+      costLabel: "MP7",
+      mpCost: 7,
+      minLevel: 6,
+      effect: "heal",
+      healMultiplier: 1.85,
+      description: "中級回復魔法。HPを中程度回復する。",
+    },
     herb: {
+      category: "item",
       name: "薬草",
       costLabel: "どうぐ",
+      minLevel: 1,
       description: "薬草を使ってHPを少し回復する。",
+    },
+  };
+  const EQUIPMENT_ITEMS = {
+    copperSword: {
+      name: "銅の剣",
+      slot: "weapon",
+      attack: 8,
+      description: "扱いやすい剣。攻撃力+8",
+    },
+    rangerVest: {
+      name: "旅人の服",
+      slot: "armor",
+      defense: 7,
+      agility: 2,
+      description: "動きやすい服。防御力+7、素早さ+2",
+    },
+    wisdomRing: {
+      name: "知恵の指輪",
+      slot: "accessory",
+      wisdom: 8,
+      dexterity: 3,
+      description: "魔力を整える指輪。賢さ+8、器用さ+3",
+    },
+    ironSword: {
+      name: "鉄の剣",
+      slot: "weapon",
+      attack: 15,
+      description: "ずしりと重い剣。攻撃力+15",
+    },
+    ironArmor: {
+      name: "鉄のよろい",
+      slot: "armor",
+      defense: 14,
+      agility: -2,
+      description: "頼れるよろい。防御力+14、素早さ-2",
     },
   };
 
@@ -58,6 +144,7 @@
     dexterityValue: document.getElementById("dexterityValue"),
     goldValue: document.getElementById("goldValue"),
     herbValue: document.getElementById("herbValue"),
+    equipmentValue: document.getElementById("equipmentValue"),
     hpText: document.getElementById("hpText"),
     hpBar: document.getElementById("hpBar"),
     mpText: document.getElementById("mpText"),
@@ -123,6 +210,7 @@
     mobileDexterityValue: document.getElementById("mobileDexterityValue"),
     mobileGoldValue: document.getElementById("mobileGoldValue"),
     mobileHerbValue: document.getElementById("mobileHerbValue"),
+    mobileEquipmentValue: document.getElementById("mobileEquipmentValue"),
     mobileHpText: document.getElementById("mobileHpText"),
     mobileHpBar: document.getElementById("mobileHpBar"),
     mobileMpText: document.getElementById("mobileMpText"),
@@ -135,10 +223,15 @@
     ".": { name: "grass", walkable: true },
     G: { name: "wild grass", walkable: true, encounter: 0.13 },
     F: { name: "flower", walkable: true, encounter: 0.07 },
+    A: { name: "forest floor", walkable: true, encounter: 0.11 },
+    B: { name: "cave floor", walkable: true, encounter: 0.15 },
     P: { name: "path", walkable: true },
     I: { name: "inn floor", walkable: true },
     D: { name: "door", walkable: true },
     T: { name: "tree", walkable: false },
+    R: { name: "rock wall", walkable: false },
+    M: { name: "mountain", walkable: false },
+    W: { name: "water", walkable: false },
     "#": { name: "wall", walkable: false },
     C: { name: "counter", walkable: false },
     S: { name: "sign", walkable: false },
@@ -147,6 +240,7 @@
   const MAPS = {
     town: {
       name: "町",
+      encounters: [],
       tiles: [
         "TTTTTTTTTTTTTTTT",
         "T......PP......T",
@@ -182,7 +276,8 @@
           hair: "#273142",
           messages: [
             "ルカ「魔王討伐は長い旅になる。迷ったら町で準備を整えよう。」",
-            "ルカ「草原の魔物で腕を磨いてから、次の目的地を探すんだ。」",
+            "ルカ「草原の東には森がある。さらに奥には洞窟が口を開けているらしい。」",
+            "ルカ「各地には魔物を率いる中ボスがいる。見かけたら準備して話しかけるんだ。」",
           ],
         },
         {
@@ -212,14 +307,15 @@
     },
     grassland: {
       name: "草原",
+      encounters: ["slime", "wolf", "wasp", "spirit"],
       tiles: [
         "TTTTTTPPPPTTTTTT",
         "TGGGGGPPGGGGGGGT",
         "TGGFFGPPGGGFGGGT",
         "TGGGGGGGGGGGGGGT",
         "TGGGTTGGGGTTGGGT",
-        "TGGGGGGPPGGGGGGT",
-        "TGGGFGGPPGGFGGGT",
+        "TGGGGGGPPGGGGGGP",
+        "TGGGFGGPPGGFGGGP",
         "TGGGGGGGGGGGGGGT",
         "TGGTTGGGGGGTTGGT",
         "TGGGGGPPGGGGGGGT",
@@ -235,6 +331,14 @@
           spawn: { x: 7, y: 10 },
           message: "町に戻った。",
         },
+        {
+          x: 15,
+          yMin: 5,
+          yMax: 6,
+          to: "forest",
+          spawn: { x: 1, y: 6 },
+          message: "森に入った。",
+        },
       ],
       entities: [
         {
@@ -245,12 +349,165 @@
           y: 6,
           contents: { herb: 2, gold: 12 },
         },
+        {
+          id: "grassland-sword",
+          kind: "chest",
+          name: "宝箱",
+          x: 2,
+          y: 9,
+          contents: { equipment: "copperSword", gold: 8 },
+        },
+        {
+          id: "grassland-warden",
+          kind: "boss",
+          name: "草原の番人",
+          x: 12,
+          y: 9,
+          body: "#835b33",
+          hair: "#2f2a22",
+          enemyId: "grassWarden",
+          messages: [
+            "草原の番人「この先は弱き者の通る道ではない。」",
+            "草原の番人「腕を示せ。さもなくばここで引き返せ！」",
+          ],
+          victoryMessage: "草原の番人は道を譲った。森への道が少し静かになった。",
+        },
+      ],
+    },
+    forest: {
+      name: "森",
+      encounters: ["leafImp", "forestBat", "wildBoar", "wasp"],
+      tiles: [
+        "TTTTTTTTTTTTTTTT",
+        "TAAAAAAPPPAAAAAT",
+        "TAATTTTAPPAADDDT",
+        "TAAAAAAPPAAAATAT",
+        "TAAFTTAAAAFTAAAT",
+        "PAAAAAPPPAAAAAAT",
+        "PAAFTAAPPPAAFTAT",
+        "TAAAAAAPPPAAAAAT",
+        "TATTTAAAPPATTAAT",
+        "TAAAAAAPPPAAAAAT",
+        "TAAAAAAPPAAAAAAT",
+        "TTTTTTTPPPTTTTTT",
+      ],
+      exits: [
+        {
+          x: 0,
+          yMin: 5,
+          yMax: 6,
+          to: "grassland",
+          spawn: { x: 14, y: 6 },
+          message: "草原に戻った。",
+        },
+        {
+          xMin: 12,
+          xMax: 14,
+          y: 2,
+          to: "cave",
+          spawn: { x: 7, y: 10 },
+          message: "洞窟に入った。",
+        },
+      ],
+      entities: [
+        {
+          id: "forest-vest",
+          kind: "chest",
+          name: "宝箱",
+          x: 11,
+          y: 5,
+          contents: { equipment: "rangerVest", herb: 1 },
+        },
+        {
+          id: "forest-ring",
+          kind: "chest",
+          name: "宝箱",
+          x: 3,
+          y: 10,
+          contents: { equipment: "wisdomRing" },
+        },
+        {
+          id: "forest-warden",
+          kind: "boss",
+          name: "森の番人",
+          x: 7,
+          y: 8,
+          body: "#3f7e4d",
+          hair: "#1f4530",
+          enemyId: "forestWarden",
+          messages: [
+            "森の番人「木々がざわめいている。人の子よ、ここを荒らすつもりか。」",
+            "森の番人「ならば森の試練を受けてみよ！」",
+          ],
+          victoryMessage: "森の番人は枝を下ろした。洞窟へ続く気配がはっきりした。",
+        },
+      ],
+    },
+    cave: {
+      name: "洞窟",
+      encounters: ["caveBat", "goblin", "stoneSlime", "spirit"],
+      tiles: [
+        "RRRRRRRRRRRRRRRR",
+        "RBBBBBBBBBBBBBBR",
+        "RBRRRBBBBRRRBBBR",
+        "RBBBBBBBBBRBBBBR",
+        "RBBRRRBBBBRRBBBR",
+        "RBBBBBBBRBBBBBBR",
+        "RRRBBBRBRBBBRRRR",
+        "RBBBBBBBRBBBBBBR",
+        "RBBBRRRBBBBRRBBR",
+        "RBBBBBBBBBBBBBBR",
+        "RBBBBRRBBBBBBBBR",
+        "RRRRRRRBBRRRRRRR",
+      ],
+      exits: [
+        {
+          xMin: 7,
+          xMax: 8,
+          y: 11,
+          to: "forest",
+          spawn: { x: 12, y: 3 },
+          message: "森に戻った。",
+        },
+      ],
+      entities: [
+        {
+          id: "cave-iron-sword",
+          kind: "chest",
+          name: "宝箱",
+          x: 13,
+          y: 9,
+          contents: { equipment: "ironSword", gold: 18 },
+        },
+        {
+          id: "cave-armor",
+          kind: "chest",
+          name: "宝箱",
+          x: 2,
+          y: 5,
+          contents: { equipment: "ironArmor" },
+        },
+        {
+          id: "cave-warden",
+          kind: "boss",
+          name: "洞窟の番人",
+          x: 7,
+          y: 5,
+          body: "#6c6875",
+          hair: "#2a2d35",
+          enemyId: "caveWarden",
+          messages: [
+            "洞窟の番人「地の底まで来るとは、なかなかの胆力だ。」",
+            "洞窟の番人「この岩穴の力、受け止めてみせろ！」",
+          ],
+          victoryMessage: "洞窟の番人を退けた。奥から冷たい風が吹いている。",
+        },
       ],
     },
   };
 
-  const ENEMIES = [
-    {
+  const ENEMY_TEMPLATES = {
+    slime: {
       name: "スライム",
       maxHp: 18,
       attack: 34,
@@ -263,7 +520,7 @@
       color: "#58a45c",
       sprite: "slime",
     },
-    {
+    wolf: {
       name: "ウルフ",
       maxHp: 24,
       attack: 44,
@@ -276,7 +533,7 @@
       color: "#6d6f7a",
       sprite: "wolf",
     },
-    {
+    wasp: {
       name: "ワスプ",
       maxHp: 16,
       attack: 40,
@@ -289,7 +546,7 @@
       color: "#d1a737",
       sprite: "wasp",
     },
-    {
+    spirit: {
       name: "まよいび",
       maxHp: 20,
       attack: 34,
@@ -302,7 +559,128 @@
       color: "#6a8bd6",
       sprite: "spirit",
     },
-  ];
+    leafImp: {
+      name: "リーフインプ",
+      maxHp: 28,
+      attack: 48,
+      defense: 24,
+      wisdom: 28,
+      agility: 36,
+      dexterity: 34,
+      exp: 14,
+      gold: 10,
+      color: "#4f9a4f",
+      sprite: "spirit",
+    },
+    forestBat: {
+      name: "もりこうもり",
+      maxHp: 22,
+      attack: 46,
+      defense: 18,
+      wisdom: 18,
+      agility: 52,
+      dexterity: 44,
+      exp: 12,
+      gold: 9,
+      color: "#5d5170",
+      sprite: "wasp",
+    },
+    wildBoar: {
+      name: "あばれイノシシ",
+      maxHp: 34,
+      attack: 56,
+      defense: 28,
+      wisdom: 14,
+      agility: 34,
+      dexterity: 28,
+      exp: 18,
+      gold: 13,
+      color: "#8b5c3d",
+      sprite: "wolf",
+    },
+    caveBat: {
+      name: "どうくつこうもり",
+      maxHp: 30,
+      attack: 58,
+      defense: 24,
+      wisdom: 22,
+      agility: 56,
+      dexterity: 48,
+      exp: 19,
+      gold: 14,
+      color: "#4d4a63",
+      sprite: "wasp",
+    },
+    goblin: {
+      name: "ゴブリン",
+      maxHp: 42,
+      attack: 66,
+      defense: 34,
+      wisdom: 24,
+      agility: 34,
+      dexterity: 38,
+      exp: 25,
+      gold: 18,
+      color: "#6d8c43",
+      sprite: "wolf",
+    },
+    stoneSlime: {
+      name: "いしスライム",
+      maxHp: 48,
+      attack: 54,
+      defense: 48,
+      wisdom: 18,
+      agility: 18,
+      dexterity: 22,
+      exp: 28,
+      gold: 16,
+      color: "#7f858d",
+      sprite: "slime",
+    },
+    grassWarden: {
+      name: "草原の番人",
+      maxHp: 70,
+      attack: 64,
+      defense: 38,
+      wisdom: 24,
+      agility: 32,
+      dexterity: 36,
+      exp: 36,
+      gold: 30,
+      color: "#835b33",
+      sprite: "wolf",
+      boss: true,
+    },
+    forestWarden: {
+      name: "森の番人",
+      maxHp: 96,
+      attack: 76,
+      defense: 48,
+      wisdom: 44,
+      agility: 38,
+      dexterity: 42,
+      exp: 58,
+      gold: 48,
+      color: "#3f7e4d",
+      sprite: "spirit",
+      boss: true,
+    },
+    caveWarden: {
+      name: "洞窟の番人",
+      maxHp: 128,
+      attack: 88,
+      defense: 62,
+      wisdom: 34,
+      agility: 28,
+      dexterity: 38,
+      exp: 82,
+      gold: 70,
+      color: "#6c6875",
+      sprite: "wolf",
+      boss: true,
+    },
+  };
+  const ENEMIES = ["slime", "wolf", "wasp", "spirit"].map((enemyId) => ENEMY_TEMPLATES[enemyId]);
 
   const TUTORIAL_ENEMY = {
     name: "訓練スライム",
@@ -348,6 +726,8 @@
   let state = createInitialState();
   let touchMoveTimer = null;
   let touchMoveInterval = null;
+  let touchMovePointerId = null;
+  let touchMoveDirection = null;
   let battleCommandView = "root";
 
   function createInitialState() {
@@ -378,12 +758,19 @@
           agility: 0,
           dexterity: 0,
         },
+        gear: {
+          weapon: null,
+          armor: null,
+          accessory: null,
+        },
         inventory: {
           herb: 1,
+          equipment: {},
         },
       },
       npcTalkIndex: {},
       openedChests: {},
+      defeatedBosses: {},
       log: ["町の南から草原へ向かえる。"],
       steps: 0,
       tutorial: {
@@ -433,14 +820,27 @@
   }
 
   function getEntityAt(x, y) {
-    return currentMap().entities.find((entity) => entity.x === x && entity.y === y);
+    return currentMap().entities.find((entity) => entity.x === x && entity.y === y && !isEntityGone(entity));
   }
 
   function getAdjacentEntity() {
     return currentMap().entities.find((entity) => {
+      if (isEntityGone(entity)) {
+        return false;
+      }
+
       const distance = Math.abs(entity.x - state.player.x) + Math.abs(entity.y - state.player.y);
       return distance === 1 || distance === 0;
     });
+  }
+
+  function isBossDefeated(entityOrId) {
+    const bossId = typeof entityOrId === "string" ? entityOrId : entityOrId.id;
+    return Boolean(state.defeatedBosses?.[bossId]);
+  }
+
+  function isEntityGone(entity) {
+    return entity.kind === "boss" && isBossDefeated(entity);
   }
 
   function addLog(text) {
@@ -557,6 +957,15 @@
     return list[Math.floor(Math.random() * list.length)];
   }
 
+  function enemyTemplateById(enemyId) {
+    return ENEMY_TEMPLATES[enemyId] || ENEMY_TEMPLATES.slime;
+  }
+
+  function chooseEnemyForCurrentMap() {
+    const encounterIds = currentMap().encounters?.length ? currentMap().encounters : ["slime"];
+    return enemyTemplateById(choose(encounterIds));
+  }
+
   function defaultBattleStats(level) {
     const levelBonus = Math.max(0, level - 1);
     return {
@@ -568,9 +977,53 @@
     };
   }
 
+  function ensureGear(player = state.player) {
+    if (!player.gear) {
+      player.gear = { weapon: null, armor: null, accessory: null };
+    }
+
+    ["weapon", "armor", "accessory"].forEach((slot) => {
+      if (!EQUIPMENT_ITEMS[player.gear[slot]]) {
+        player.gear[slot] = null;
+      }
+    });
+
+    return player.gear;
+  }
+
+  function equipmentStatsFromGear(gear) {
+    const stats = { attack: 0, defense: 0, wisdom: 0, agility: 0, dexterity: 0 };
+    Object.values(gear).forEach((itemId) => {
+      const item = EQUIPMENT_ITEMS[itemId];
+      if (!item) {
+        return;
+      }
+
+      Object.keys(stats).forEach((stat) => {
+        stats[stat] += Number(item[stat]) || 0;
+      });
+    });
+    return stats;
+  }
+
+  function syncEquipmentStats(player = state.player) {
+    const gear = ensureGear(player);
+    player.equipment = equipmentStatsFromGear(gear);
+    return player.equipment;
+  }
+
+  function hasEquippedGear(player = state.player) {
+    const gear = ensureGear(player);
+    return Object.values(gear).some(Boolean);
+  }
+
   function ensureEquipment(entity = state.player) {
     if (!entity.equipment) {
       entity.equipment = {};
+    }
+
+    if (entity === state.player && hasEquippedGear(entity)) {
+      return syncEquipmentStats(entity);
     }
 
     ["attack", "defense", "wisdom", "agility", "dexterity"].forEach((stat) => {
@@ -621,14 +1074,25 @@
     return { damage, isCritical };
   }
 
-  function calculateMagicHeal(caster) {
+  function calculateMagicHeal(caster, multiplier = 1) {
     const wisdomScore = Math.floor(effectiveStat(caster, "wisdom") / 2);
     const levelScore = Math.floor(caster.level * 3);
     const baseHeal = Math.max(1, wisdomScore + levelScore);
     const dexterityFactor = dexterityModifier(caster);
     const equipmentFactor = equipmentModifier(caster, "wisdom");
     const variance = randomInt(96, 108) / 100;
-    return Math.max(1, Math.floor(((baseHeal * dexterityFactor * equipmentFactor * variance) / 2) + 6));
+    return Math.max(1, Math.floor(((baseHeal * multiplier * dexterityFactor * equipmentFactor * variance) / 2) + 6));
+  }
+
+  function calculateMagicDamage(caster, defender, action) {
+    const wisdomScore = Math.floor(effectiveStat(caster, "wisdom") / 2);
+    const resistance = Math.floor((effectiveStat(defender, "wisdom") + effectiveStat(defender, "defense")) / 8);
+    const baseDamage = Math.max(1, wisdomScore + (action.power || 12) - resistance);
+    const dexterityFactor = dexterityModifier(caster);
+    const equipmentFactor = equipmentModifier(caster, "wisdom");
+    const variance = randomInt(94, 108) / 100;
+    const damage = Math.max(1, Math.floor(((baseDamage * dexterityFactor * equipmentFactor * variance) / 3) + 1));
+    return { damage };
   }
 
   function adjustedAgility(entity) {
@@ -648,11 +1112,44 @@
     }
 
     player.inventory.herb = Math.max(0, Number(player.inventory.herb) || 0);
+    if (!player.inventory.equipment) {
+      player.inventory.equipment = {};
+    }
     return player.inventory;
   }
 
   function getHerbCount() {
     return ensureInventory().herb;
+  }
+
+  function equipmentSlotLabel(slot) {
+    return {
+      weapon: "武器",
+      armor: "防具",
+      accessory: "装飾",
+    }[slot] || slot;
+  }
+
+  function equipmentSummary(player = state.player) {
+    const gear = ensureGear(player);
+    return ["weapon", "armor", "accessory"]
+      .map((slot) => `${equipmentSlotLabel(slot)}: ${EQUIPMENT_ITEMS[gear[slot]]?.name || "なし"}`)
+      .join(" / ");
+  }
+
+  function equipItem(itemId) {
+    const item = EQUIPMENT_ITEMS[itemId];
+    if (!item) {
+      return null;
+    }
+
+    const inventory = ensureInventory();
+    inventory.equipment[itemId] = true;
+    const gear = ensureGear();
+    const previousItem = EQUIPMENT_ITEMS[gear[item.slot]] || null;
+    gear[item.slot] = itemId;
+    syncEquipmentStats();
+    return { item, previousItem };
   }
 
   function isChestOpen(chest) {
@@ -687,11 +1184,19 @@
 
   function tryMapExit() {
     const exit = currentMap().exits.find((candidate) => {
-      return (
+      const onHorizontalExit = (
+        Number.isFinite(candidate.y) &&
         candidate.y === state.player.y &&
         state.player.x >= candidate.xMin &&
         state.player.x <= candidate.xMax
       );
+      const onVerticalExit = (
+        Number.isFinite(candidate.x) &&
+        candidate.x === state.player.x &&
+        state.player.y >= candidate.yMin &&
+        state.player.y <= candidate.yMax
+      );
+      return onHorizontalExit || onVerticalExit;
     });
 
     if (!exit) {
@@ -711,7 +1216,7 @@
     const encounterRate = TILES[tile].encounter || 0;
 
     if (encounterRate > 0 && Math.random() < encounterRate) {
-      startBattle(choose(ENEMIES));
+      startBattle(chooseEnemyForCurrentMap());
     }
   }
 
@@ -751,7 +1256,36 @@
 
     if (entity.kind === "chest") {
       await openChest(entity);
+      return;
     }
+
+    if (entity.kind === "boss") {
+      await challengeBoss(entity);
+    }
+  }
+
+  async function challengeBoss(entity) {
+    if (isBossDefeated(entity)) {
+      await say(entity.name, "ここにはもう強い魔物の気配はない。");
+      return;
+    }
+
+    const willFight = await ask(entity.name, "ただならぬ気配がする。挑みますか？");
+    if (!willFight) {
+      await say(entity.name, "今は退くことにした。");
+      return;
+    }
+
+    for (const message of entity.messages || []) {
+      const splitMessage = splitNpcMessage(entity, message);
+      await say(splitMessage.speaker, splitMessage.text);
+    }
+
+    startBattle(enemyTemplateById(entity.enemyId), {
+      bossId: entity.id,
+      victorySpeaker: entity.name,
+      victoryMessage: entity.victoryMessage,
+    });
   }
 
   async function stayAtInn() {
@@ -788,6 +1322,9 @@
     const inventory = ensureInventory();
     const herb = chest.contents.herb || 0;
     const gold = chest.contents.gold || 0;
+    const equipmentIds = Array.isArray(chest.contents.equipment)
+      ? chest.contents.equipment
+      : [chest.contents.equipment].filter(Boolean);
     inventory.herb += herb;
     state.player.gold += gold;
     state.openedChests[chest.id] = true;
@@ -800,6 +1337,17 @@
     if (gold > 0) {
       rewards.push(`${gold}G`);
     }
+    equipmentIds.forEach((equipmentId) => {
+      const equipResult = equipItem(equipmentId);
+      if (!equipResult) {
+        return;
+      }
+
+      const replacement = equipResult.previousItem
+        ? `（${equipResult.previousItem.name}と交換して装備）`
+        : "（装備）";
+      rewards.push(`${equipResult.item.name}${replacement}`);
+    });
 
     render();
     await say("宝箱", `宝箱を開けた。\n${rewards.join(" と ")}を手に入れた。`);
@@ -813,7 +1361,14 @@
     };
 
     state.mode = "battle";
-    state.battle = { enemy, busy: false, tutorial: Boolean(options.tutorial || enemyTemplate.tutorial) };
+    state.battle = {
+      enemy,
+      busy: false,
+      tutorial: Boolean(options.tutorial || enemyTemplate.tutorial),
+      bossId: options.bossId || null,
+      victorySpeaker: options.victorySpeaker || "",
+      victoryMessage: options.victoryMessage || "",
+    };
     battleCommandView = "root";
     pendingBattleAction = null;
     setBattleMessage(`${enemy.name}が現れた。`);
@@ -954,42 +1509,70 @@
     renderHud();
   }
 
+  function learnedBattleActionTypes(category, level = state.player.level) {
+    return Object.entries(BATTLE_ACTION_DETAILS)
+      .filter(([, action]) => action.category === category && (action.minLevel || 1) <= level)
+      .map(([type]) => type);
+  }
+
+  function isBattleActionLearned(type) {
+    const action = BATTLE_ACTION_DETAILS[type];
+    return Boolean(action && (action.minLevel || 1) <= state.player.level);
+  }
+
+  function battleActionTypesForView(view) {
+    if (view === "skillList") {
+      return learnedBattleActionTypes("skill").slice(0, 3);
+    }
+    if (view === "magicList") {
+      return learnedBattleActionTypes("magic").slice(0, 3);
+    }
+    if (view === "itemList") {
+      return ["herb"];
+    }
+    return [];
+  }
+
   function getBattleActionInfo(type) {
     const herbCount = getHerbCount();
-    const fullSlash = BATTLE_ACTION_DETAILS.fullSlash;
-    const heal = BATTLE_ACTION_DETAILS.heal;
-    const herb = BATTLE_ACTION_DETAILS.herb;
-    const actions = {
-      fullSlash: {
-        label: `${fullSlash.name}（消費${fullSlash.costLabel}）`,
-        shortLabel: fullSlash.name,
-        costLabel: fullSlash.costLabel,
-        description: fullSlash.description,
-        fromView: "skillList",
-        disabled: state.player.mp < FULL_SLASH_COST,
-        execute: playerFullSlash,
-      },
-      heal: {
-        label: `${heal.name}（消費${heal.costLabel}）`,
-        shortLabel: heal.name,
-        costLabel: heal.costLabel,
-        description: heal.description,
-        fromView: "magicList",
-        disabled: state.player.mp < HEAL_MAGIC_COST,
-        execute: playerHeal,
-      },
-      herb: {
-        label: `${herb.name}（残り${herbCount}個）`,
-        shortLabel: herb.name,
-        costLabel: `残り${herbCount}`,
-        description: herb.description,
-        fromView: "itemList",
-        disabled: herbCount <= 0,
-        execute: playerUseHerb,
-      },
-    };
+    const action = BATTLE_ACTION_DETAILS[type];
+    if (!action) {
+      return null;
+    }
 
-    return actions[type];
+    const mpCost = Number(action.mpCost) || 0;
+    const fromView = {
+      skill: "skillList",
+      magic: "magicList",
+      item: "itemList",
+    }[action.category];
+    const itemDisabled = action.category === "item" && herbCount <= 0;
+    const actionDisabled = action.category !== "item" && (!isBattleActionLearned(type) || state.player.mp < mpCost);
+
+    return {
+      ...action,
+      type,
+      label: action.category === "item"
+        ? `${action.name}（残り${herbCount}個）`
+        : `${action.name}（消費${action.costLabel}）`,
+      shortLabel: action.name,
+      costLabel: action.category === "item" ? `残り${herbCount}` : action.costLabel,
+      fromView,
+      disabled: itemDisabled || actionDisabled,
+      execute: () => executeBattleAction(type),
+    };
+  }
+
+  function battleActionButtonLabel(type) {
+    const action = getBattleActionInfo(type);
+    if (!action) {
+      return "";
+    }
+
+    if (action.category === "item") {
+      return `${action.name} x${getHerbCount()}`;
+    }
+    return `${action.name} ${action.costLabel}`;
   }
 
   function chooseBattleAction(type) {
@@ -1003,6 +1586,11 @@
     }
 
     const action = getBattleActionInfo(type);
+    if (action && !isBattleActionLearned(type)) {
+      setBattleMessage("まだ覚えていない。");
+      return;
+    }
+
     if (!action || action.disabled) {
       setBattleMessage("今は使えない。");
       return;
@@ -1012,6 +1600,15 @@
     battleCommandView = "confirm";
     setBattleMessage(action.description);
     renderHud();
+  }
+
+  function chooseListedBattleAction(index) {
+    const actionType = battleActionTypesForView(battleCommandView)[index];
+    if (!actionType) {
+      return;
+    }
+
+    chooseBattleAction(actionType);
   }
 
   function confirmPendingBattleAction() {
@@ -1046,14 +1643,26 @@
   function handleBattlePrimaryButton() {
     if (battleCommandView === "action") {
       chooseBattleAction("attack");
-    } else if (battleCommandView === "skillList") {
-      chooseBattleAction("fullSlash");
-    } else if (battleCommandView === "magicList") {
-      chooseBattleAction("heal");
-    } else if (battleCommandView === "itemList") {
-      chooseBattleAction("herb");
+    } else if (battleCommandView === "skillList" || battleCommandView === "magicList" || battleCommandView === "itemList") {
+      chooseListedBattleAction(0);
     } else if (battleCommandView === "confirm") {
       confirmPendingBattleAction();
+    }
+  }
+
+  function handleBattleSecondaryButton() {
+    if (battleCommandView === "action") {
+      openBattleSkillMenu();
+    } else if (battleCommandView === "skillList" || battleCommandView === "magicList" || battleCommandView === "itemList") {
+      chooseListedBattleAction(1);
+    }
+  }
+
+  function handleBattleTertiaryButton() {
+    if (battleCommandView === "action") {
+      openBattleMagicMenu();
+    } else if (battleCommandView === "skillList" || battleCommandView === "magicList" || battleCommandView === "itemList") {
+      chooseListedBattleAction(2);
     }
   }
 
@@ -1125,23 +1734,45 @@
     }), "attack");
   }
 
-  async function playerFullSlash() {
+  async function executeBattleAction(type) {
+    const action = getBattleActionInfo(type);
+    if (!action) {
+      return;
+    }
+
+    if (action.category === "item") {
+      await playerUseHerb();
+    } else if (action.category === "skill") {
+      await playerPhysicalSkill(type);
+    } else if (action.category === "magic" && action.effect === "damage") {
+      await playerAttackMagic(type);
+    } else if (action.category === "magic") {
+      await playerHealingMagic(type);
+    }
+  }
+
+  async function playerPhysicalSkill(type) {
     if (state.mode !== "battle" || isBattleBusy()) {
       return;
     }
 
-    if (state.player.mp < FULL_SLASH_COST) {
+    const action = getBattleActionInfo(type);
+    if (!action || state.player.mp < action.mpCost) {
       addLog("MPが足りない。");
       render();
       return;
     }
 
     await runPlayerBattleAction(() => executePhysicalPlayerAction({
-      label: "全力斬り",
-      attackMultiplier: 1.5,
-      mpCost: FULL_SLASH_COST,
+      label: action.name,
+      attackMultiplier: action.attackMultiplier || 1,
+      mpCost: action.mpCost,
       actionType: "skill",
     }), "skill");
+  }
+
+  async function playerFullSlash() {
+    await playerPhysicalSkill("fullSlash");
   }
 
   async function executePhysicalPlayerAction({ label, attackMultiplier, mpCost = 0, actionType = "attack" }) {
@@ -1174,8 +1805,13 @@
     render();
   }
 
-  async function playerHeal() {
+  async function playerHealingMagic(type) {
     if (state.mode !== "battle" || isBattleBusy()) {
+      return;
+    }
+
+    const action = getBattleActionInfo(type);
+    if (!action) {
       return;
     }
 
@@ -1185,21 +1821,58 @@
       return;
     }
 
-    if (state.player.mp < HEAL_MAGIC_COST) {
+    if (state.player.mp < action.mpCost) {
       addLog("MPが足りない。");
       render();
       return;
     }
 
     await runPlayerBattleAction(async () => {
-      const healAmount = calculateMagicHeal(state.player);
+      const healAmount = calculateMagicHeal(state.player, action.healMultiplier || 1);
       const before = state.player.hp;
-      state.player.mp = clamp(state.player.mp - HEAL_MAGIC_COST, 0, state.player.maxMp);
+      state.player.mp = clamp(state.player.mp - action.mpCost, 0, state.player.maxMp);
       state.player.hp = clamp(state.player.hp + healAmount, 0, state.player.maxHp);
       const recovered = state.player.hp - before;
-      addLog(`回復の魔法を唱えた。HPが${recovered}回復。`);
+      addLog(`${action.name}の魔法を唱えた。HPが${recovered}回復。`);
       playHealSound();
       await playEffect({ type: "heal", amount: recovered }, EFFECT_DURATIONS.heal);
+    }, "magic");
+  }
+
+  async function playerHeal() {
+    await playerHealingMagic("heal");
+  }
+
+  async function playerAttackMagic(type) {
+    if (state.mode !== "battle" || isBattleBusy()) {
+      return;
+    }
+
+    const action = getBattleActionInfo(type);
+    if (!action || state.player.mp < action.mpCost) {
+      addLog("MPが足りない。");
+      render();
+      return;
+    }
+
+    await runPlayerBattleAction(async () => {
+      const enemy = state.battle.enemy;
+      state.player.mp = clamp(state.player.mp - action.mpCost, 0, state.player.maxMp);
+      const result = calculateMagicDamage(state.player, enemy, action);
+      playMagicSound();
+      await playEffect({ type: "magicAttack", damage: result.damage }, EFFECT_DURATIONS.heal);
+
+      enemy.hp = clamp(enemy.hp - result.damage, 0, enemy.maxHp);
+      addLog(`${action.name}を唱えた。${enemy.name}に${result.damage}ダメージ。`);
+
+      if (enemy.hp <= 0) {
+        playDefeatSound();
+        await playEffect({ type: "defeat" }, EFFECT_DURATIONS.defeat);
+        await finishBattle(enemy);
+        return;
+      }
+
+      render();
     }, "magic");
   }
 
@@ -1300,6 +1973,11 @@
 
   async function finishBattle(enemy) {
     const wasTutorialBattle = Boolean(enemy.tutorial && state.tutorial?.active);
+    const battleMeta = {
+      bossId: state.battle?.bossId || null,
+      victorySpeaker: state.battle?.victorySpeaker || enemy.name,
+      victoryMessage: state.battle?.victoryMessage || "",
+    };
     battleCommandView = "root";
     pendingBattleAction = null;
     state.player.gold += enemy.gold;
@@ -1323,7 +2001,12 @@
         `賢さ ${result.before.wisdom} → ${result.after.wisdom}`,
         `素早さ ${result.before.agility} → ${result.after.agility}`,
         `器用さ ${result.before.dexterity} → ${result.after.dexterity}`,
+        ...result.learned.map((action) => `${battleActionKindLabel(action)}「${action.name}」を覚えた！`),
       ].join("\n"));
+    }
+
+    if (battleMeta.bossId) {
+      state.defeatedBosses[battleMeta.bossId] = true;
     }
 
     state.mode = "explore";
@@ -1331,9 +2014,28 @@
     battleCommandView = "root";
     render();
 
+    if (battleMeta.bossId && battleMeta.victoryMessage) {
+      await say(battleMeta.victorySpeaker, battleMeta.victoryMessage);
+    }
+
     if (wasTutorialBattle) {
       await runPostTutorialSequence();
     }
+  }
+
+  function battleActionKindLabel(action) {
+    return action.category === "skill" ? "特技" : "魔法";
+  }
+
+  function learnedActionsBetween(beforeLevel, afterLevel) {
+    return Object.values(BATTLE_ACTION_DETAILS)
+      .filter((action) => {
+        return (
+          (action.category === "skill" || action.category === "magic") &&
+          action.minLevel > beforeLevel &&
+          action.minLevel <= afterLevel
+        );
+      });
   }
 
   function gainExp(amount) {
@@ -1376,6 +2078,7 @@
           agility: state.player.agility,
           dexterity: state.player.dexterity,
         },
+        learned: learnedActionsBetween(before.level, state.player.level),
       });
     }
 
@@ -1528,6 +2231,12 @@
     playTone(860, 0.19, 0.18, "sine", 0.05);
   }
 
+  function playMagicSound() {
+    playTone(330, 0, 0.09, "triangle", 0.05);
+    playTone(740, 0.07, 0.11, "square", 0.055);
+    playTone(990, 0.17, 0.1, "sawtooth", 0.04);
+  }
+
   function playItemSound() {
     playTone(660, 0, 0.07, "square", 0.04);
     playTone(880, 0.08, 0.08, "square", 0.045);
@@ -1588,6 +2297,7 @@
       player: state.player,
       npcTalkIndex: state.npcTalkIndex,
       openedChests: state.openedChests,
+      defeatedBosses: state.defeatedBosses,
       log: state.log,
       steps: state.steps,
       tutorial: {
@@ -1629,6 +2339,12 @@
     const savedHerb = payload.player.inventory?.herb;
     const loadedInventory = {
       herb: Number.isFinite(savedHerb) ? Math.max(0, savedHerb) : 1,
+      equipment: payload.player.inventory?.equipment || {},
+    };
+    const loadedGear = {
+      weapon: EQUIPMENT_ITEMS[payload.player.gear?.weapon] ? payload.player.gear.weapon : null,
+      armor: EQUIPMENT_ITEMS[payload.player.gear?.armor] ? payload.player.gear.armor : null,
+      accessory: EQUIPMENT_ITEMS[payload.player.gear?.accessory] ? payload.player.gear.accessory : null,
     };
     const loadedEquipment = {
       attack: Number(payload.player.equipment?.attack) || 0,
@@ -1661,10 +2377,12 @@
         nextExp: payload.player.nextExp,
         gold: payload.player.gold,
         equipment: loadedEquipment,
+        gear: loadedGear,
         inventory: loadedInventory,
       },
       npcTalkIndex: payload.npcTalkIndex || {},
       openedChests: payload.openedChests || {},
+      defeatedBosses: payload.defeatedBosses || {},
       log: Array.isArray(payload.log) ? payload.log.slice(0, 8) : ["ロードした。"],
       steps: payload.steps || 0,
       tutorial: {
@@ -1677,13 +2395,16 @@
     battleCommandView = "root";
     pendingBattleAction = null;
     controlsLocked = false;
+    if (hasEquippedGear(state.player)) {
+      syncEquipmentStats();
+    }
     setBattleMessage("ロードした。");
     render();
     showFieldMessage("", "ロードした。");
   }
 
   function isValidSave(payload) {
-    if (!payload || ![1, 2, 3, 4].includes(payload.version)) {
+    if (!payload || ![1, 2, 3, 4, 5].includes(payload.version)) {
       return false;
     }
 
@@ -1755,6 +2476,19 @@
       ctx.fillStyle = "rgba(98, 76, 42, 0.12)";
       ctx.fillRect(px + 2, py + 10, 8, 3);
       ctx.fillRect(px + 20, py + 24, 9, 3);
+    } else if (tile === "A") {
+      ctx.fillStyle = "#3f7e4d";
+      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      drawGrassDetails(px, py, tile);
+      ctx.fillStyle = "rgba(27, 70, 38, 0.45)";
+      ctx.fillRect(px + 4, py + 5, 5, 9);
+      ctx.fillRect(px + 22, py + 19, 4, 8);
+    } else if (tile === "B") {
+      ctx.fillStyle = "#5c5a63";
+      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      ctx.fillStyle = "rgba(30, 31, 36, 0.18)";
+      ctx.fillRect(px + 3, py + 8, 10, 3);
+      ctx.fillRect(px + 18, py + 22, 9, 3);
     } else if (tile === "I") {
       ctx.fillStyle = "#d7ba7a";
       ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -1774,6 +2508,23 @@
       ctx.fillStyle = "#5b4a3f";
       ctx.fillRect(px, py + 14, TILE_SIZE, 3);
       ctx.fillRect(px + 14, py, 3, TILE_SIZE);
+    } else if (tile === "R") {
+      ctx.fillStyle = "#3b3a42";
+      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      ctx.fillStyle = "#57545f";
+      ctx.fillRect(px + 2, py + 5, 11, 7);
+      ctx.fillRect(px + 17, py + 18, 12, 8);
+    } else if (tile === "M") {
+      ctx.fillStyle = "#68685d";
+      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      ctx.fillStyle = "#4d4e46";
+      ctx.fillRect(px + 4, py + 9, 24, 18);
+    } else if (tile === "W") {
+      ctx.fillStyle = "#3e7da8";
+      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+      ctx.fillStyle = "rgba(217, 241, 255, 0.38)";
+      ctx.fillRect(px + 2, py + 10, 14, 3);
+      ctx.fillRect(px + 14, py + 22, 16, 3);
     } else {
       ctx.fillStyle = tile === "G" || tile === "F" ? "#4f9a4f" : "#67aa5f";
       ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -1823,14 +2574,33 @@
   }
 
   function drawEntity(entity) {
+    if (isEntityGone(entity)) {
+      return;
+    }
+
     if (entity.kind === "chest") {
       drawChest(entity);
       drawNameplate(isChestOpen(entity) ? "空" : entity.name, entity.x, entity.y);
       return;
     }
 
+    if (entity.kind === "boss") {
+      drawCharacter(entity.x, entity.y, entity.body || "#835b33", entity.hair || "#2f2a22");
+      drawBossMark(entity.x, entity.y);
+      drawNameplate(entity.name, entity.x, entity.y);
+      return;
+    }
+
     drawCharacter(entity.x, entity.y, entity.body, entity.hair);
     drawNameplate(entity.name, entity.x, entity.y);
+  }
+
+  function drawBossMark(x, y) {
+    const px = x * TILE_SIZE;
+    const py = y * TILE_SIZE;
+    ctx.fillStyle = "#e05a48";
+    ctx.fillRect(px + 8, py + 3, 5, 5);
+    ctx.fillRect(px + 19, py + 3, 5, 5);
   }
 
   function drawChest(chest) {
@@ -1886,8 +2656,10 @@
     ctx.font = "10px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
+    const width = Math.max(30, ctx.measureText(name).width + 6);
+    const left = px + 16 - width / 2;
     ctx.fillStyle = "rgba(24, 28, 25, 0.7)";
-    ctx.fillRect(px + 1, py - 1, 30, 12);
+    ctx.fillRect(left, py - 1, width, 12);
     ctx.fillStyle = "#ffffff";
     ctx.fillText(name, px + 16, py);
     ctx.restore();
@@ -2053,12 +2825,15 @@
       return;
     }
 
+    const listLabels = battleActionTypesForView(battleCommandView)
+      .map((type) => getBattleActionInfo(type)?.name)
+      .filter(Boolean);
     const menuLabels = {
       root: ["たたかう", "どうぐ", "にげる"],
       action: ["攻撃", "特技", "魔法", "戻る"],
-      skillList: ["全力斬り", `MP${FULL_SLASH_COST}`, "戻る"],
-      magicList: ["回復", `MP${HEAL_MAGIC_COST}`, "戻る"],
-      itemList: ["薬草", `x${getHerbCount()}`, "戻る"],
+      skillList: [...listLabels, "戻る"],
+      magicList: [...listLabels, "戻る"],
+      itemList: [...listLabels, "戻る"],
     }[battleCommandView] || ["たたかう", "どうぐ", "にげる"];
 
     menuLabels.forEach((label, index) => {
@@ -2103,6 +2878,8 @@
       drawEnemyAttackEffect(effect, centerX, centerY);
     } else if (effect.type === "heal") {
       drawHealEffect(effect, centerX, centerY);
+    } else if (effect.type === "magicAttack") {
+      drawMagicAttackEffect(effect, centerX, centerY);
     } else if (effect.type === "run") {
       drawRunEffect(effect, centerX, centerY);
     } else if (effect.type === "defeat") {
@@ -2202,6 +2979,28 @@
     ctx.restore();
 
     drawFloatingText(`+${effect.amount}`, centerX, centerY + 62, progress, "#2f8f54");
+  }
+
+  function drawMagicAttackEffect(effect, centerX, centerY) {
+    const progress = effect.progress;
+    const travel = easeOutCubic(progress);
+    const x = centerX - 130 + travel * 132;
+    const y = centerY + 84 - travel * 92;
+    const alpha = progress < 0.86 ? 1 : 1 - (progress - 0.86) / 0.14;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#f6b24a";
+    ctx.fillRect(x - 11, y - 11, 22, 22);
+    ctx.fillStyle = "#e05a48";
+    ctx.fillRect(x - 7, y - 7, 14, 14);
+    ctx.fillStyle = "#fff5c2";
+    ctx.fillRect(x - 3, y - 3, 6, 6);
+    ctx.restore();
+
+    if (progress > 0.42) {
+      drawFloatingText(`-${effect.damage}`, centerX, centerY - 56, progress, "#e05a48");
+    }
   }
 
   function drawRunEffect(effect, centerX, centerY) {
@@ -2313,6 +3112,8 @@
     ui.mobileGoldValue.textContent = player.gold;
     ui.herbValue.textContent = herbCount;
     ui.mobileHerbValue.textContent = herbCount;
+    ui.equipmentValue.textContent = equipmentSummary(player);
+    ui.mobileEquipmentValue.textContent = equipmentSummary(player);
     ui.hpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
     ui.hpBar.style.width = `${hpRatio}%`;
     ui.mobileHpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
@@ -2346,38 +3147,44 @@
     setCommandButton(ui.itemButton, "item", "どうぐ", false, isBattleChoiceDisabled("item", controlsBusy, herbCount <= 0));
     setCommandButton(ui.runButton, "run", "逃げる", false, isBattleChoiceDisabled("run", controlsBusy));
 
+    const listedActions = battleActionTypesForView(battleCommandView);
     let primaryChoice = "attack";
     let primaryLabel = "攻撃";
+    let primaryHidden = false;
     let primaryDisabled = false;
-    let skillHidden = false;
-    let magicHidden = false;
+    let secondaryChoice = "skill";
+    let secondaryLabel = "特技";
+    let secondaryHidden = false;
+    let secondaryDisabled = false;
+    let tertiaryChoice = "magic";
+    let tertiaryLabel = "魔法";
+    let tertiaryHidden = false;
+    let tertiaryDisabled = false;
     let backChoice = "back";
     let backLabel = "戻る";
     let backDisabled = false;
 
-    if (battleCommandView === "skillList") {
-      primaryChoice = "fullSlash";
-      primaryLabel = `全力斬り MP${FULL_SLASH_COST}`;
-      primaryDisabled = player.mp < FULL_SLASH_COST;
-      skillHidden = true;
-      magicHidden = true;
-    } else if (battleCommandView === "magicList") {
-      primaryChoice = "heal";
-      primaryLabel = `回復 MP${HEAL_MAGIC_COST}`;
-      primaryDisabled = player.mp < HEAL_MAGIC_COST;
-      skillHidden = true;
-      magicHidden = true;
-    } else if (battleCommandView === "itemList") {
-      primaryChoice = "herb";
-      primaryLabel = `薬草 x${herbCount}`;
-      primaryDisabled = herbCount <= 0;
-      skillHidden = true;
-      magicHidden = true;
+    if (battleCommandView === "skillList" || battleCommandView === "magicList" || battleCommandView === "itemList") {
+      const firstAction = getBattleActionInfo(listedActions[0]);
+      const secondAction = getBattleActionInfo(listedActions[1]);
+      const thirdAction = getBattleActionInfo(listedActions[2]);
+      primaryChoice = listedActions[0] || "none";
+      primaryLabel = listedActions[0] ? battleActionButtonLabel(listedActions[0]) : "なし";
+      primaryHidden = !listedActions[0];
+      primaryDisabled = !firstAction || firstAction.disabled;
+      secondaryChoice = listedActions[1] || "none";
+      secondaryLabel = listedActions[1] ? battleActionButtonLabel(listedActions[1]) : "";
+      secondaryHidden = !listedActions[1];
+      secondaryDisabled = !secondAction || secondAction.disabled;
+      tertiaryChoice = listedActions[2] || "none";
+      tertiaryLabel = listedActions[2] ? battleActionButtonLabel(listedActions[2]) : "";
+      tertiaryHidden = !listedActions[2];
+      tertiaryDisabled = !thirdAction || thirdAction.disabled;
     } else if (battleCommandView === "confirm") {
       primaryChoice = "confirmYes";
       primaryLabel = "はい";
-      skillHidden = true;
-      magicHidden = true;
+      secondaryHidden = true;
+      tertiaryHidden = true;
       backChoice = "confirmNo";
       backLabel = "いいえ";
     }
@@ -2386,11 +3193,23 @@
       ui.attackButton,
       primaryChoice,
       primaryLabel,
-      false,
+      primaryHidden,
       isBattleChoiceDisabled(primaryChoice, controlsBusy, primaryDisabled),
     );
-    setCommandButton(ui.skillButton, "skill", "特技", skillHidden, isBattleChoiceDisabled("skill", controlsBusy));
-    setCommandButton(ui.magicButton, "magic", "魔法", magicHidden, isBattleChoiceDisabled("magic", controlsBusy));
+    setCommandButton(
+      ui.skillButton,
+      secondaryChoice,
+      secondaryLabel,
+      secondaryHidden,
+      isBattleChoiceDisabled(secondaryChoice, controlsBusy, secondaryDisabled),
+    );
+    setCommandButton(
+      ui.magicButton,
+      tertiaryChoice,
+      tertiaryLabel,
+      tertiaryHidden,
+      isBattleChoiceDisabled(tertiaryChoice, controlsBusy, tertiaryDisabled),
+    );
     setCommandButton(ui.backButton, backChoice, backLabel, false, isBattleChoiceDisabled(backChoice, controlsBusy, backDisabled));
 
     ui.saveButton.disabled = isBattle || controlsBusy || Boolean(state.tutorial?.active);
@@ -2425,11 +3244,23 @@
       ui.touchAttackButton,
       primaryChoice,
       primaryLabel,
-      battleCommandView === "root",
+      battleCommandView === "root" || primaryHidden,
       isBattleChoiceDisabled(primaryChoice, controlsBusy, primaryDisabled),
     );
-    setCommandButton(ui.touchSkillButton, "skill", "特技", battleCommandView !== "action", isBattleChoiceDisabled("skill", controlsBusy));
-    setCommandButton(ui.touchMagicButton, "magic", "魔法", battleCommandView !== "action", isBattleChoiceDisabled("magic", controlsBusy));
+    setCommandButton(
+      ui.touchSkillButton,
+      secondaryChoice,
+      secondaryLabel,
+      battleCommandView === "root" || secondaryHidden,
+      isBattleChoiceDisabled(secondaryChoice, controlsBusy, secondaryDisabled),
+    );
+    setCommandButton(
+      ui.touchMagicButton,
+      tertiaryChoice,
+      tertiaryLabel,
+      battleCommandView === "root" || tertiaryHidden,
+      isBattleChoiceDisabled(tertiaryChoice, controlsBusy, tertiaryDisabled),
+    );
     setCommandButton(
       ui.touchBackButton,
       backChoice,
@@ -2483,9 +3314,19 @@
         if (event.key === "1") {
           handleBattlePrimaryButton();
         } else if (event.key === "2") {
-          openBattleSkillMenu();
+          handleBattleSecondaryButton();
         } else if (event.key === "3") {
-          openBattleMagicMenu();
+          handleBattleTertiaryButton();
+        } else if (event.key === "4" || event.key === "Escape") {
+          handleBattleBackButton();
+        }
+      } else if (battleCommandView === "skillList" || battleCommandView === "magicList" || battleCommandView === "itemList") {
+        if (event.key === "1" || event.key === "Enter") {
+          handleBattlePrimaryButton();
+        } else if (event.key === "2") {
+          handleBattleSecondaryButton();
+        } else if (event.key === "3") {
+          handleBattleTertiaryButton();
         } else if (event.key === "4" || event.key === "Escape") {
           handleBattleBackButton();
         }
@@ -2512,19 +3353,34 @@
 
   function handleTouchMoveStart(event) {
     const direction = TOUCH_DIRECTIONS[event.currentTarget.dataset.move];
-    if (!direction) {
+    if (!direction || event.currentTarget.disabled) {
       return;
     }
 
     event.preventDefault();
     stopTouchMove();
+    touchMovePointerId = event.pointerId;
+    touchMoveDirection = direction;
+
+    if (event.currentTarget.setPointerCapture) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
     movePlayer(direction.x, direction.y);
 
+    const repeatMove = () => {
+      if (!touchMoveDirection || state.mode !== "explore" || isInputLocked()) {
+        stopTouchMove();
+        return;
+      }
+
+      movePlayer(touchMoveDirection.x, touchMoveDirection.y);
+    };
+
     touchMoveTimer = window.setTimeout(() => {
-      touchMoveInterval = window.setInterval(() => {
-        movePlayer(direction.x, direction.y);
-      }, 170);
-    }, 280);
+      repeatMove();
+      touchMoveInterval = window.setInterval(repeatMove, TOUCH_HOLD_REPEAT_DELAY);
+    }, TOUCH_HOLD_INITIAL_DELAY);
   }
 
   function handleTouchAction() {
@@ -2546,7 +3402,11 @@
     }, 0);
   }
 
-  function stopTouchMove() {
+  function stopTouchMove(event) {
+    if (event?.pointerId && touchMovePointerId !== null && event.pointerId !== touchMovePointerId) {
+      return;
+    }
+
     if (touchMoveTimer) {
       window.clearTimeout(touchMoveTimer);
       touchMoveTimer = null;
@@ -2556,6 +3416,9 @@
       window.clearInterval(touchMoveInterval);
       touchMoveInterval = null;
     }
+
+    touchMovePointerId = null;
+    touchMoveDirection = null;
   }
 
   function bindEvents() {
@@ -2566,8 +3429,8 @@
     ui.interactButton.addEventListener("click", interact);
     ui.fightButton.addEventListener("click", openBattleActionMenu);
     ui.attackButton.addEventListener("click", handleBattlePrimaryButton);
-    ui.skillButton.addEventListener("click", openBattleSkillMenu);
-    ui.magicButton.addEventListener("click", openBattleMagicMenu);
+    ui.skillButton.addEventListener("click", handleBattleSecondaryButton);
+    ui.magicButton.addEventListener("click", handleBattleTertiaryButton);
     ui.backButton.addEventListener("click", handleBattleBackButton);
     ui.itemButton.addEventListener("click", openBattleItemMenu);
     ui.runButton.addEventListener("click", playerRun);
@@ -2582,8 +3445,8 @@
     ui.touchInteractButton.addEventListener("click", handleTouchAction);
     ui.touchFightButton.addEventListener("click", openBattleActionMenu);
     ui.touchAttackButton.addEventListener("click", handleBattlePrimaryButton);
-    ui.touchSkillButton.addEventListener("click", openBattleSkillMenu);
-    ui.touchMagicButton.addEventListener("click", openBattleMagicMenu);
+    ui.touchSkillButton.addEventListener("click", handleBattleSecondaryButton);
+    ui.touchMagicButton.addEventListener("click", handleBattleTertiaryButton);
     ui.touchBackButton.addEventListener("click", handleBattleBackButton);
     ui.touchItemButton.addEventListener("click", openBattleItemMenu);
     ui.touchRunButton.addEventListener("click", playerRun);
@@ -2599,6 +3462,7 @@
     ui.touchMoveButtons.forEach((button) => {
       button.addEventListener("pointerdown", handleTouchMoveStart);
       button.addEventListener("pointerleave", stopTouchMove);
+      button.addEventListener("contextmenu", (event) => event.preventDefault());
     });
   }
 
