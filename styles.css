@@ -71,6 +71,13 @@ button.subtle {
   border-color: var(--line);
 }
 
+button.guided-command {
+  border-color: #f5d66b;
+  background: #ba7b2a;
+  box-shadow: 0 0 0 4px rgba(245, 214, 107, 0.28);
+  animation: guidedPulse 920ms ease-in-out infinite;
+}
+
 .app-shell {
   width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
@@ -141,6 +148,11 @@ h2 {
   padding: 10px;
 }
 
+.screen-frame {
+  position: relative;
+  width: 100%;
+}
+
 #gameCanvas {
   display: block;
   width: 100%;
@@ -150,6 +162,88 @@ h2 {
   background: #4e8e57;
   image-rendering: pixelated;
   touch-action: none;
+  transition: filter 180ms ease;
+}
+
+.screen-frame.has-message #gameCanvas {
+  filter: brightness(0.72) saturate(0.88);
+}
+
+.field-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 4px;
+  background: #050607;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 900ms ease;
+}
+
+.field-fade.visible {
+  opacity: 0.86;
+}
+
+.field-fade[hidden],
+.field-message[hidden],
+.message-choices[hidden] {
+  display: none !important;
+}
+
+.field-message {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  left: 18px;
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  min-height: 92px;
+  padding: 14px 16px 12px;
+  border: 3px solid #fffaf1;
+  border-radius: 4px;
+  background: rgba(17, 19, 24, 0.93);
+  color: #fffaf1;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+  line-height: 1.55;
+}
+
+.message-speaker {
+  justify-self: start;
+  min-width: 86px;
+  padding: 3px 10px;
+  border: 2px solid #fffaf1;
+  border-radius: 4px;
+  background: #fffaf1;
+  color: #15191f;
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.message-speaker:empty {
+  display: none;
+}
+
+.field-message p {
+  margin: 0;
+  min-height: 1.55em;
+  font-weight: 800;
+  white-space: pre-line;
+}
+
+.message-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.message-prompt {
+  justify-self: end;
+  color: #fffaf1;
+  font-size: 0.8rem;
+  animation: promptBlink 860ms steps(2, end) infinite;
 }
 
 .touch-controls {
@@ -257,6 +351,11 @@ h2 {
 
 .battle-touch-menu.action-menu {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.battle-touch-menu.list-menu,
+.battle-touch-menu.confirm-menu {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .battle-touch-menu[hidden] {
@@ -410,6 +509,19 @@ dd {
   line-height: 1.45;
 }
 
+@keyframes promptBlink {
+  50% {
+    opacity: 0.28;
+  }
+}
+
+@keyframes guidedPulse {
+  50% {
+    box-shadow: 0 0 0 7px rgba(245, 214, 107, 0.14);
+    filter: brightness(1.08);
+  }
+}
+
 @media (max-width: 880px) {
   body.battle-focus {
     overflow: hidden;
@@ -510,6 +622,20 @@ dd {
 }
 
 @media (max-width: 430px) {
+  .field-message {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    min-height: 82px;
+    padding: 11px 12px 10px;
+    font-size: 0.9rem;
+  }
+
+  .message-speaker {
+    min-width: 74px;
+    font-size: 0.78rem;
+  }
+
   .save-controls,
   .command-grid,
   .stats-grid {

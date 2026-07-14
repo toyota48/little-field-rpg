@@ -24,7 +24,19 @@
 
       <section class="game-layout" aria-label="game area">
         <div class="playfield">
-          <canvas id="gameCanvas" width="512" height="384" aria-label="game screen"></canvas>
+          <div id="screenFrame" class="screen-frame">
+            <canvas id="gameCanvas" width="512" height="384" aria-label="game screen"></canvas>
+            <div id="fieldFade" class="field-fade" hidden></div>
+            <section id="fieldMessage" class="field-message" aria-live="polite" hidden>
+              <div id="messageSpeaker" class="message-speaker"></div>
+              <p id="messageText"></p>
+              <div id="messageChoices" class="message-choices" hidden>
+                <button id="messageYesButton" type="button">はい</button>
+                <button id="messageNoButton" type="button" class="subtle">いいえ</button>
+              </div>
+              <span id="messagePrompt" class="message-prompt" aria-hidden="true">▼</span>
+            </section>
+          </div>
           <section class="touch-controls" aria-label="mobile movement controls">
             <div class="dpad" aria-label="movement pad">
               <button class="touch-button dpad-up" type="button" data-move="up" aria-label="上へ移動">▲</button>
@@ -155,7 +167,7 @@
             </div>
           </section>
 
-          <section class="panel log-panel">
+          <section class="panel log-panel" hidden>
             <h2>ログ</h2>
             <ul id="logList" aria-live="polite"></ul>
           </section>
