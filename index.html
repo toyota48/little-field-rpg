@@ -15,6 +15,7 @@
           <p class="eyebrow">2D Browser RPG</p>
           <h1>Little Field RPG</h1>
         </div>
+        <button id="menuButton" class="mobile-menu-button" type="button" aria-controls="mobileMenuPanel" aria-expanded="false">メニュー</button>
         <div class="save-controls" aria-label="save controls">
           <button id="saveButton" type="button">セーブ</button>
           <button id="loadButton" type="button">ロード</button>
@@ -22,10 +23,91 @@
         </div>
       </header>
 
+      <section id="mobileMenuPanel" class="mobile-menu-panel" aria-label="mobile menu" hidden>
+        <div class="mobile-menu-heading">
+          <h2>メニュー</h2>
+          <button id="menuCloseButton" type="button" class="subtle">閉じる</button>
+        </div>
+
+        <div class="mobile-menu-actions" aria-label="save controls">
+          <button id="menuSaveButton" type="button">セーブ</button>
+          <button id="menuLoadButton" type="button">ロード</button>
+          <button id="menuResetButton" type="button" class="subtle">最初から</button>
+        </div>
+
+        <section class="mobile-status-panel" aria-label="mobile status">
+          <div class="panel-heading">
+            <h2>ステータス</h2>
+            <span id="mobileModeValue" class="mode-pill">探索中</span>
+          </div>
+
+          <dl class="stats-grid mobile-stats-grid">
+            <div>
+              <dt>マップ</dt>
+              <dd id="mobileMapValue">町</dd>
+            </div>
+            <div>
+              <dt>Lv</dt>
+              <dd id="mobileLevelValue">1</dd>
+            </div>
+            <div>
+              <dt>攻撃力</dt>
+              <dd id="mobileAttackValue">46</dd>
+            </div>
+            <div>
+              <dt>防御力</dt>
+              <dd id="mobileDefenseValue">26</dd>
+            </div>
+            <div>
+              <dt>賢さ</dt>
+              <dd id="mobileWisdomValue">34</dd>
+            </div>
+            <div>
+              <dt>素早さ</dt>
+              <dd id="mobileAgilityValue">30</dd>
+            </div>
+            <div>
+              <dt>器用さ</dt>
+              <dd id="mobileDexterityValue">30</dd>
+            </div>
+            <div>
+              <dt>お金</dt>
+              <dd><span id="mobileGoldValue">0</span> G</dd>
+            </div>
+            <div>
+              <dt>薬草</dt>
+              <dd><span id="mobileHerbValue">1</span> 個</dd>
+            </div>
+          </dl>
+
+          <div class="meter-row">
+            <span id="mobileHpText">HP 30 / 30</span>
+            <div class="meter hp-meter" aria-hidden="true">
+              <span id="mobileHpBar"></span>
+            </div>
+          </div>
+
+          <div class="meter-row">
+            <span id="mobileMpText">MP 10 / 10</span>
+            <div class="meter mp-meter" aria-hidden="true">
+              <span id="mobileMpBar"></span>
+            </div>
+          </div>
+
+          <div class="meter-row">
+            <span id="mobileExpText">EXP 0 / 12</span>
+            <div class="meter exp-meter" aria-hidden="true">
+              <span id="mobileExpBar"></span>
+            </div>
+          </div>
+        </section>
+      </section>
+
       <section class="game-layout" aria-label="game area">
         <div class="playfield">
           <div id="screenFrame" class="screen-frame">
             <canvas id="gameCanvas" width="512" height="384" aria-label="game screen"></canvas>
+            <div id="fieldMapBadge" class="field-map-badge">町</div>
             <div id="fieldFade" class="field-fade" hidden></div>
             <section id="fieldMessage" class="field-message" aria-live="polite" hidden>
               <div id="messageSpeaker" class="message-speaker"></div>

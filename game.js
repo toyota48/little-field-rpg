@@ -17,6 +17,23 @@
     run: 320,
     defeat: 420,
   };
+  const BATTLE_ACTION_DETAILS = {
+    fullSlash: {
+      name: "全力斬り",
+      costLabel: `MP${FULL_SLASH_COST}`,
+      description: "全力を尽くして切りかかる。対象に小ダメージ",
+    },
+    heal: {
+      name: "回復",
+      costLabel: `MP${HEAL_MAGIC_COST}`,
+      description: "初級回復魔法。少量のHPを回復する。",
+    },
+    herb: {
+      name: "薬草",
+      costLabel: "どうぐ",
+      description: "薬草を使ってHPを少し回復する。",
+    },
+  };
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
@@ -31,6 +48,7 @@
 
   const ui = {
     mapValue: document.getElementById("mapValue"),
+    fieldMapBadge: document.getElementById("fieldMapBadge"),
     modeValue: document.getElementById("modeValue"),
     levelValue: document.getElementById("levelValue"),
     attackValue: document.getElementById("attackValue"),
@@ -89,6 +107,28 @@
     touchBackButton: document.getElementById("touchBackButton"),
     touchItemButton: document.getElementById("touchItemButton"),
     touchRunButton: document.getElementById("touchRunButton"),
+    menuButton: document.getElementById("menuButton"),
+    mobileMenuPanel: document.getElementById("mobileMenuPanel"),
+    menuCloseButton: document.getElementById("menuCloseButton"),
+    menuSaveButton: document.getElementById("menuSaveButton"),
+    menuLoadButton: document.getElementById("menuLoadButton"),
+    menuResetButton: document.getElementById("menuResetButton"),
+    mobileMapValue: document.getElementById("mobileMapValue"),
+    mobileModeValue: document.getElementById("mobileModeValue"),
+    mobileLevelValue: document.getElementById("mobileLevelValue"),
+    mobileAttackValue: document.getElementById("mobileAttackValue"),
+    mobileDefenseValue: document.getElementById("mobileDefenseValue"),
+    mobileWisdomValue: document.getElementById("mobileWisdomValue"),
+    mobileAgilityValue: document.getElementById("mobileAgilityValue"),
+    mobileDexterityValue: document.getElementById("mobileDexterityValue"),
+    mobileGoldValue: document.getElementById("mobileGoldValue"),
+    mobileHerbValue: document.getElementById("mobileHerbValue"),
+    mobileHpText: document.getElementById("mobileHpText"),
+    mobileHpBar: document.getElementById("mobileHpBar"),
+    mobileMpText: document.getElementById("mobileMpText"),
+    mobileMpBar: document.getElementById("mobileMpBar"),
+    mobileExpText: document.getElementById("mobileExpText"),
+    mobileExpBar: document.getElementById("mobileExpBar"),
   };
 
   const TILES = {
@@ -480,6 +520,31 @@
     });
   }
 
+  function openMobileMenu() {
+    if (!ui.mobileMenuPanel || state.mode === "battle") {
+      return;
+    }
+
+    ui.mobileMenuPanel.hidden = false;
+    ui.menuButton?.setAttribute("aria-expanded", "true");
+    document.body.classList.add("menu-open");
+  }
+
+  function closeMobileMenu() {
+    if (!ui.mobileMenuPanel) {
+      return;
+    }
+
+    ui.mobileMenuPanel.hidden = true;
+    ui.menuButton?.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("menu-open");
+  }
+
+  function runMobileMenuAction(action) {
+    closeMobileMenu();
+    action();
+  }
+
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
   }
@@ -741,6 +806,7 @@
   }
 
   function startBattle(enemyTemplate, options = {}) {
+    closeMobileMenu();
     const enemy = {
       ...enemyTemplate,
       hp: enemyTemplate.maxHp,
@@ -890,24 +956,33 @@
 
   function getBattleActionInfo(type) {
     const herbCount = getHerbCount();
+    const fullSlash = BATTLE_ACTION_DETAILS.fullSlash;
+    const heal = BATTLE_ACTION_DETAILS.heal;
+    const herb = BATTLE_ACTION_DETAILS.herb;
     const actions = {
       fullSlash: {
-        label: `全力斬り（消費MP${FULL_SLASH_COST}）`,
-        confirm: `全力斬り（消費MP${FULL_SLASH_COST}）\n本当に使いますか？`,
+        label: `${fullSlash.name}（消費${fullSlash.costLabel}）`,
+        shortLabel: fullSlash.name,
+        costLabel: fullSlash.costLabel,
+        description: fullSlash.description,
         fromView: "skillList",
         disabled: state.player.mp < FULL_SLASH_COST,
         execute: playerFullSlash,
       },
       heal: {
-        label: `回復（消費MP${HEAL_MAGIC_COST}）`,
-        confirm: `回復（消費MP${HEAL_MAGIC_COST}）\n本当に使いますか？`,
+        label: `${heal.name}（消費${heal.costLabel}）`,
+        shortLabel: heal.name,
+        costLabel: heal.costLabel,
+        description: heal.description,
         fromView: "magicList",
         disabled: state.player.mp < HEAL_MAGIC_COST,
         execute: playerHeal,
       },
       herb: {
-        label: `薬草（残り${herbCount}個）`,
-        confirm: `薬草（残り${herbCount}個）\n本当に使いますか？`,
+        label: `${herb.name}（残り${herbCount}個）`,
+        shortLabel: herb.name,
+        costLabel: `残り${herbCount}`,
+        description: herb.description,
         fromView: "itemList",
         disabled: herbCount <= 0,
         execute: playerUseHerb,
@@ -935,7 +1010,7 @@
 
     pendingBattleAction = { type, fromView: action.fromView };
     battleCommandView = "confirm";
-    setBattleMessage(action.confirm);
+    setBattleMessage(action.description);
     renderHud();
   }
 
@@ -1842,17 +1917,10 @@
       ctx.fillRect(x, y, 2, 2);
     }
 
-    drawRetroWindow(18, 16, 176, 58);
-    ctx.fillStyle = "#fffaf1";
-    ctx.font = "bold 17px sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(enemy.name, 36, 42);
-    ctx.font = "14px sans-serif";
-    ctx.fillText(`HP ${enemy.hp} / ${enemy.maxHp}`, 36, 62);
-
     ctx.save();
     ctx.globalAlpha = enemyAlpha;
     ctx.translate(enemyJolt, 0);
+    drawBattleEnemyName(enemy, centerX, enemyY - 94);
     drawEnemySprite(enemy, centerX, enemyY);
     ctx.restore();
 
@@ -1862,6 +1930,30 @@
 
     drawBattleMessage(battleMessage || "どうする？");
     drawBattleCommandWindow();
+  }
+
+  function enemyHealthTextColor(enemy) {
+    const ratio = (enemy.hp / enemy.maxHp) * 100;
+    if (ratio <= 20) {
+      return "#e05a48";
+    }
+    if (ratio <= 50) {
+      return "#f5d66b";
+    }
+    return "#fffaf1";
+  }
+
+  function drawBattleEnemyName(enemy, centerX, y) {
+    const label = enemy.name;
+    ctx.save();
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const width = Math.max(84, ctx.measureText(label).width + 28);
+    drawRetroWindow(centerX - width / 2, y - 20, width, 40);
+    ctx.fillStyle = enemyHealthTextColor(enemy);
+    ctx.fillText(label, centerX, y);
+    ctx.restore();
   }
 
   function drawEnemySprite(enemy, centerX, centerY) {
@@ -1942,24 +2034,37 @@
   }
 
   function drawBattleCommandWindow() {
-    drawRetroWindow(348, 268, 146, 92);
+    drawRetroWindow(340, 268, 154, 92);
     ctx.fillStyle = "#fffaf1";
     ctx.font = "bold 14px sans-serif";
     ctx.textAlign = "left";
 
+    if (battleCommandView === "confirm" && pendingBattleAction) {
+      const action = getBattleActionInfo(pendingBattleAction.type);
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText(`HP ${state.player.hp}/${state.player.maxHp}`, 356, 286);
+      ctx.fillText(`MP ${state.player.mp}/${state.player.maxMp}`, 356, 301);
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText(`${action.shortLabel}を`, 356, 320);
+      ctx.fillText("使いますか？", 356, 335);
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText("はい", 360, 352);
+      ctx.fillText("いいえ", 418, 352);
+      return;
+    }
+
     const menuLabels = {
       root: ["たたかう", "どうぐ", "にげる"],
       action: ["攻撃", "特技", "魔法", "戻る"],
-      skillList: [`全力斬り MP${FULL_SLASH_COST}`, "戻る"],
-      magicList: [`回復 MP${HEAL_MAGIC_COST}`, "戻る"],
-      itemList: [`薬草 x${getHerbCount()}`, "戻る"],
-      confirm: ["はい", "いいえ"],
+      skillList: ["全力斬り", `MP${FULL_SLASH_COST}`, "戻る"],
+      magicList: ["回復", `MP${HEAL_MAGIC_COST}`, "戻る"],
+      itemList: ["薬草", `x${getHerbCount()}`, "戻る"],
     }[battleCommandView] || ["たたかう", "どうぐ", "にげる"];
 
     menuLabels.forEach((label, index) => {
       const column = index % 2;
       const row = Math.floor(index / 2);
-      ctx.fillText(label, 366 + column * 62, 298 + row * 26);
+      ctx.fillText(label, 356 + column * 62, 298 + row * 26);
     });
   }
 
@@ -2177,6 +2282,7 @@
     const enemy = state.battle?.enemy;
     const busy = isBattleBusy();
     const isBattle = state.mode === "battle";
+    const messageOpen = Boolean(activeMessage);
     const controlsBusy = busy || isInputLocked();
     const hpRatio = (player.hp / player.maxHp) * 100;
     const mpRatio = (player.mp / player.maxMp) * 100;
@@ -2185,30 +2291,49 @@
 
     document.body.classList.toggle("battle-focus", isBattle);
     ui.mapValue.textContent = currentMap().name;
+    ui.fieldMapBadge.textContent = currentMap().name;
     ui.modeValue.textContent = busy ? "演出中" : isBattle ? "戦闘中" : "探索中";
     ui.modeValue.classList.toggle("battle", isBattle);
+    ui.mobileMapValue.textContent = currentMap().name;
+    ui.mobileModeValue.textContent = ui.modeValue.textContent;
+    ui.mobileModeValue.classList.toggle("battle", isBattle);
     ui.levelValue.textContent = player.level;
+    ui.mobileLevelValue.textContent = player.level;
     ui.attackValue.textContent = effectiveStat(player, "attack");
+    ui.mobileAttackValue.textContent = effectiveStat(player, "attack");
     ui.defenseValue.textContent = effectiveStat(player, "defense");
+    ui.mobileDefenseValue.textContent = effectiveStat(player, "defense");
     ui.wisdomValue.textContent = effectiveStat(player, "wisdom");
+    ui.mobileWisdomValue.textContent = effectiveStat(player, "wisdom");
     ui.agilityValue.textContent = effectiveStat(player, "agility");
+    ui.mobileAgilityValue.textContent = effectiveStat(player, "agility");
     ui.dexterityValue.textContent = effectiveStat(player, "dexterity");
+    ui.mobileDexterityValue.textContent = effectiveStat(player, "dexterity");
     ui.goldValue.textContent = player.gold;
+    ui.mobileGoldValue.textContent = player.gold;
     ui.herbValue.textContent = herbCount;
+    ui.mobileHerbValue.textContent = herbCount;
     ui.hpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
     ui.hpBar.style.width = `${hpRatio}%`;
+    ui.mobileHpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
+    ui.mobileHpBar.style.width = `${hpRatio}%`;
     ui.touchHpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
     ui.touchHpBar.style.width = `${hpRatio}%`;
     ui.mpText.textContent = `MP ${player.mp} / ${player.maxMp}`;
     ui.mpBar.style.width = `${mpRatio}%`;
+    ui.mobileMpText.textContent = `MP ${player.mp} / ${player.maxMp}`;
+    ui.mobileMpBar.style.width = `${mpRatio}%`;
     ui.touchMpText.textContent = `MP ${player.mp} / ${player.maxMp}`;
     ui.touchMpBar.style.width = `${mpRatio}%`;
     ui.expText.textContent = `EXP ${player.exp} / ${player.nextExp}`;
     ui.expBar.style.width = `${expRatio}%`;
+    ui.mobileExpText.textContent = `EXP ${player.exp} / ${player.nextExp}`;
+    ui.mobileExpBar.style.width = `${expRatio}%`;
 
-    ui.enemyPanel.hidden = !enemy;
+    ui.enemyPanel.hidden = true;
     if (enemy) {
       ui.enemyName.textContent = enemy.name;
+      ui.enemyName.style.color = enemyHealthTextColor(enemy);
       ui.enemyHpText.textContent = `HP ${enemy.hp} / ${enemy.maxHp}`;
       ui.enemyHpBar.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
     }
@@ -2271,10 +2396,14 @@
     ui.saveButton.disabled = isBattle || controlsBusy || Boolean(state.tutorial?.active);
     ui.loadButton.disabled = controlsBusy;
     ui.resetButton.disabled = controlsBusy;
+    ui.menuSaveButton.disabled = ui.saveButton.disabled;
+    ui.menuLoadButton.disabled = ui.loadButton.disabled;
+    ui.menuResetButton.disabled = ui.resetButton.disabled;
+    ui.menuButton.disabled = isBattle || controlsBusy;
     ui.touchBattleStatus.hidden = !isBattle;
-    ui.touchInteractButton.hidden = isBattle;
+    ui.touchInteractButton.hidden = isBattle && !messageOpen;
     ui.touchInteractButton.textContent = "決定";
-    ui.touchInteractButton.disabled = controlsBusy || (!isBattle && state.mode !== "explore");
+    ui.touchInteractButton.disabled = !messageOpen && (controlsBusy || (!isBattle && state.mode !== "explore"));
     ui.battleTouchMenu.hidden = !isBattle || controlsBusy;
     ui.battleTouchMenu.classList.toggle("action-menu", battleCommandView === "action");
     ui.battleTouchMenu.classList.toggle(
@@ -2399,6 +2528,11 @@
   }
 
   function handleTouchAction() {
+    if (activeMessage) {
+      advanceFieldMessage(activeMessage.choices ? true : undefined);
+      return;
+    }
+
     interact();
   }
 
@@ -2440,6 +2574,11 @@
     ui.saveButton.addEventListener("click", saveGame);
     ui.loadButton.addEventListener("click", loadGame);
     ui.resetButton.addEventListener("click", resetGame);
+    ui.menuButton.addEventListener("click", openMobileMenu);
+    ui.menuCloseButton.addEventListener("click", closeMobileMenu);
+    ui.menuSaveButton.addEventListener("click", () => runMobileMenuAction(saveGame));
+    ui.menuLoadButton.addEventListener("click", () => runMobileMenuAction(loadGame));
+    ui.menuResetButton.addEventListener("click", () => runMobileMenuAction(resetGame));
     ui.touchInteractButton.addEventListener("click", handleTouchAction);
     ui.touchFightButton.addEventListener("click", openBattleActionMenu);
     ui.touchAttackButton.addEventListener("click", handleBattlePrimaryButton);

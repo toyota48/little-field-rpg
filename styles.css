@@ -131,6 +131,11 @@ h2 {
   min-width: min(100%, 312px);
 }
 
+.mobile-menu-button,
+.mobile-menu-panel {
+  display: none;
+}
+
 .game-layout {
   display: grid;
   grid-template-columns: minmax(0, 512px) minmax(300px, 1fr);
@@ -155,6 +160,28 @@ h2 {
 .screen-frame {
   position: relative;
   width: 100%;
+}
+
+.field-map-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  min-width: 64px;
+  padding: 5px 10px;
+  border: 2px solid #fffaf1;
+  border-radius: 4px;
+  background: rgba(17, 19, 24, 0.9);
+  color: #fffaf1;
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.25;
+  text-align: center;
+  pointer-events: none;
+}
+
+body.battle-focus .field-map-badge {
+  display: none;
 }
 
 #gameCanvas {
@@ -371,6 +398,29 @@ h2 {
   padding: 0 8px;
 }
 
+body.battle-focus .command-panel button,
+body.battle-focus .battle-command {
+  border: 2px solid #fffaf1;
+  border-radius: 4px;
+  background: #15191f;
+  color: #fffaf1;
+  box-shadow: none;
+}
+
+body.battle-focus .command-panel button.subtle,
+body.battle-focus .battle-command.subtle {
+  background: #1f242b;
+  color: #fffaf1;
+  border-color: #fffaf1;
+}
+
+body.battle-focus .command-panel button.guided-command,
+body.battle-focus .battle-command.guided-command {
+  border-color: #f5d66b;
+  background: #15191f;
+  box-shadow: 0 0 0 4px rgba(245, 214, 107, 0.25);
+}
+
 .hud {
   display: grid;
   gap: 12px;
@@ -538,7 +588,8 @@ dd {
 
   .topbar {
     display: grid;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
   }
 
   .game-layout {
@@ -546,7 +597,87 @@ dd {
   }
 
   .save-controls {
-    width: 100%;
+    display: none;
+  }
+
+  .mobile-menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 96px;
+    border: 2px solid #fffaf1;
+    border-radius: 4px;
+    background: #15191f;
+    color: #fffaf1;
+  }
+
+  .mobile-menu-panel {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    right: 10px;
+    left: 10px;
+    z-index: 20;
+    max-height: calc(100dvh - max(24px, env(safe-area-inset-top)) - 16px);
+    overflow: auto;
+    padding: 14px;
+    border: 3px solid #fffaf1;
+    border-radius: 6px;
+    background: rgba(17, 19, 24, 0.96);
+    color: #fffaf1;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.38);
+  }
+
+  .mobile-menu-panel:not([hidden]) {
+    display: grid;
+    gap: 12px;
+  }
+
+  .mobile-menu-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-menu-heading h2 {
+    margin: 0;
+    color: #fffaf1;
+  }
+
+  .mobile-menu-heading button,
+  .mobile-menu-actions button {
+    border: 2px solid #fffaf1;
+    border-radius: 4px;
+    background: #15191f;
+    color: #fffaf1;
+  }
+
+  .mobile-menu-heading button.subtle,
+  .mobile-menu-actions button.subtle {
+    background: #fffaf1;
+    color: #15191f;
+  }
+
+  .mobile-menu-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mobile-status-panel {
+    padding: 12px;
+    border: 2px solid #fffaf1;
+    border-radius: 4px;
+    background: #fffaf1;
+    color: var(--ink);
+  }
+
+  .mobile-status-panel .panel-heading h2 {
+    margin-bottom: 0;
+  }
+
+  .hud {
+    display: none;
   }
 
   .touch-controls {
@@ -626,6 +757,10 @@ dd {
 }
 
 @media (max-width: 430px) {
+  h1 {
+    font-size: 1.55rem;
+  }
+
   .field-message {
     right: 10px;
     bottom: 10px;
@@ -640,29 +775,39 @@ dd {
     font-size: 0.78rem;
   }
 
-  .save-controls,
   .command-grid,
   .stats-grid {
     grid-template-columns: 1fr;
   }
 
-  .touch-controls {
+  .mobile-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-menu-actions {
     grid-template-columns: 1fr;
+  }
+
+  .touch-controls {
+    grid-template-columns: minmax(146px, auto) minmax(92px, 1fr);
     justify-items: center;
+    justify-content: center;
+    gap: 12px;
   }
 
   .dpad {
-    grid-template-columns: repeat(3, 56px);
-    grid-template-rows: repeat(3, 56px);
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(3, 48px);
   }
 
   .touch-button {
-    min-width: 56px;
-    min-height: 56px;
+    min-width: 48px;
+    min-height: 48px;
   }
 
   .touch-action {
-    width: 180px;
+    width: 104px;
+    min-height: 58px;
   }
 
   body.battle-focus .touch-action {
