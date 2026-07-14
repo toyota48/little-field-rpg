@@ -48,10 +48,13 @@
             </div>
             <button id="touchInteractButton" class="touch-button touch-action" type="button">決定</button>
             <div id="battleTouchMenu" class="battle-touch-menu" hidden>
-              <button id="touchAttackButton" class="battle-command" type="button">攻撃</button>
-              <button id="touchHealButton" class="battle-command" type="button">まほう</button>
+              <button id="touchFightButton" class="battle-command" type="button">たたかう</button>
               <button id="touchItemButton" class="battle-command" type="button">どうぐ</button>
               <button id="touchRunButton" class="battle-command" type="button">逃げる</button>
+              <button id="touchAttackButton" class="battle-command" type="button">攻撃</button>
+              <button id="touchSkillButton" class="battle-command" type="button">特技</button>
+              <button id="touchMagicButton" class="battle-command" type="button">魔法</button>
+              <button id="touchBackButton" class="battle-command" type="button">戻る</button>
             </div>
           </section>
         </div>
@@ -74,7 +77,23 @@
               </div>
               <div>
                 <dt>攻撃力</dt>
-                <dd id="attackValue">6</dd>
+                <dd id="attackValue">46</dd>
+              </div>
+              <div>
+                <dt>防御力</dt>
+                <dd id="defenseValue">26</dd>
+              </div>
+              <div>
+                <dt>賢さ</dt>
+                <dd id="wisdomValue">34</dd>
+              </div>
+              <div>
+                <dt>素早さ</dt>
+                <dd id="agilityValue">30</dd>
+              </div>
+              <div>
+                <dt>器用さ</dt>
+                <dd id="dexterityValue">30</dd>
               </div>
               <div>
                 <dt>お金</dt>
@@ -120,12 +139,19 @@
 
           <section class="panel command-panel">
             <h2>コマンド</h2>
-            <div class="command-grid">
+            <div id="exploreCommandGrid" class="command-grid">
               <button id="interactButton" type="button">決定</button>
-              <button id="attackButton" type="button">攻撃</button>
-              <button id="healButton" type="button">まほう</button>
+            </div>
+            <div id="battleRootMenu" class="command-grid battle-root-grid" hidden>
+              <button id="fightButton" type="button">たたかう</button>
               <button id="itemButton" type="button">どうぐ</button>
               <button id="runButton" type="button">逃げる</button>
+            </div>
+            <div id="battleActionMenu" class="command-grid battle-action-grid" hidden>
+              <button id="attackButton" type="button">攻撃</button>
+              <button id="skillButton" type="button">特技</button>
+              <button id="magicButton" type="button">魔法</button>
+              <button id="backButton" type="button" class="subtle">戻る</button>
             </div>
           </section>
 

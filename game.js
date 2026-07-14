@@ -6,7 +6,8 @@
   const MAP_ROWS = 12;
   const SAVE_KEY = "little-field-rpg-save-v1";
   const INN_PRICE = 6;
-  const HEAL_MAGIC_COST = 4;
+  const HEAL_MAGIC_COST = 3;
+  const FULL_SLASH_COST = 3;
   const HERB_HEAL = 18;
   const EFFECT_DURATIONS = {
     slash: 360,
@@ -28,6 +29,10 @@
     modeValue: document.getElementById("modeValue"),
     levelValue: document.getElementById("levelValue"),
     attackValue: document.getElementById("attackValue"),
+    defenseValue: document.getElementById("defenseValue"),
+    wisdomValue: document.getElementById("wisdomValue"),
+    agilityValue: document.getElementById("agilityValue"),
+    dexterityValue: document.getElementById("dexterityValue"),
     goldValue: document.getElementById("goldValue"),
     herbValue: document.getElementById("herbValue"),
     hpText: document.getElementById("hpText"),
@@ -41,9 +46,15 @@
     enemyHpText: document.getElementById("enemyHpText"),
     enemyHpBar: document.getElementById("enemyHpBar"),
     logList: document.getElementById("logList"),
+    exploreCommandGrid: document.getElementById("exploreCommandGrid"),
+    battleRootMenu: document.getElementById("battleRootMenu"),
+    battleActionMenu: document.getElementById("battleActionMenu"),
     interactButton: document.getElementById("interactButton"),
+    fightButton: document.getElementById("fightButton"),
     attackButton: document.getElementById("attackButton"),
-    healButton: document.getElementById("healButton"),
+    skillButton: document.getElementById("skillButton"),
+    magicButton: document.getElementById("magicButton"),
+    backButton: document.getElementById("backButton"),
     itemButton: document.getElementById("itemButton"),
     runButton: document.getElementById("runButton"),
     saveButton: document.getElementById("saveButton"),
@@ -57,8 +68,11 @@
     touchMpText: document.getElementById("touchMpText"),
     touchMpBar: document.getElementById("touchMpBar"),
     battleTouchMenu: document.getElementById("battleTouchMenu"),
+    touchFightButton: document.getElementById("touchFightButton"),
     touchAttackButton: document.getElementById("touchAttackButton"),
-    touchHealButton: document.getElementById("touchHealButton"),
+    touchSkillButton: document.getElementById("touchSkillButton"),
+    touchMagicButton: document.getElementById("touchMagicButton"),
+    touchBackButton: document.getElementById("touchBackButton"),
     touchItemButton: document.getElementById("touchItemButton"),
     touchRunButton: document.getElementById("touchRunButton"),
   };
@@ -169,10 +183,58 @@
   };
 
   const ENEMIES = [
-    { name: "スライム", maxHp: 18, attack: 4, exp: 6, gold: 4, color: "#58a45c", sprite: "slime" },
-    { name: "ウルフ", maxHp: 24, attack: 6, exp: 10, gold: 7, color: "#6d6f7a", sprite: "wolf" },
-    { name: "ワスプ", maxHp: 16, attack: 7, exp: 9, gold: 6, color: "#d1a737", sprite: "wasp" },
-    { name: "まよいび", maxHp: 20, attack: 5, exp: 8, gold: 8, color: "#6a8bd6", sprite: "spirit" },
+    {
+      name: "スライム",
+      maxHp: 18,
+      attack: 34,
+      defense: 16,
+      wisdom: 10,
+      agility: 16,
+      dexterity: 18,
+      exp: 6,
+      gold: 4,
+      color: "#58a45c",
+      sprite: "slime",
+    },
+    {
+      name: "ウルフ",
+      maxHp: 24,
+      attack: 44,
+      defense: 22,
+      wisdom: 14,
+      agility: 40,
+      dexterity: 34,
+      exp: 10,
+      gold: 7,
+      color: "#6d6f7a",
+      sprite: "wolf",
+    },
+    {
+      name: "ワスプ",
+      maxHp: 16,
+      attack: 40,
+      defense: 16,
+      wisdom: 18,
+      agility: 46,
+      dexterity: 38,
+      exp: 9,
+      gold: 6,
+      color: "#d1a737",
+      sprite: "wasp",
+    },
+    {
+      name: "まよいび",
+      maxHp: 20,
+      attack: 34,
+      defense: 20,
+      wisdom: 40,
+      agility: 32,
+      dexterity: 34,
+      exp: 8,
+      gold: 8,
+      color: "#6a8bd6",
+      sprite: "spirit",
+    },
   ];
 
   const DIRECTIONS = {
@@ -204,7 +266,7 @@
   let state = createInitialState();
   let touchMoveTimer = null;
   let touchMoveInterval = null;
-  let battleCommandOpen = false;
+  let battleCommandView = "root";
 
   function createInitialState() {
     return {
@@ -219,10 +281,21 @@
         maxHp: 30,
         mp: 10,
         maxMp: 10,
-        attack: 6,
+        attack: 46,
+        defense: 26,
+        wisdom: 34,
+        agility: 30,
+        dexterity: 30,
         exp: 0,
         nextExp: 12,
         gold: 0,
+        equipment: {
+          attack: 0,
+          defense: 0,
+          wisdom: 0,
+          agility: 0,
+          dexterity: 0,
+        },
         inventory: {
           herb: 1,
         },
@@ -299,6 +372,91 @@
 
   function choose(list) {
     return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function defaultBattleStats(level) {
+    const levelBonus = Math.max(0, level - 1);
+    return {
+      attack: 46 + levelBonus * 5,
+      defense: 26 + levelBonus * 4,
+      wisdom: 34 + levelBonus * 4,
+      agility: 30 + levelBonus * 3,
+      dexterity: 30 + levelBonus * 3,
+    };
+  }
+
+  function ensureEquipment(entity = state.player) {
+    if (!entity.equipment) {
+      entity.equipment = {};
+    }
+
+    ["attack", "defense", "wisdom", "agility", "dexterity"].forEach((stat) => {
+      entity.equipment[stat] = Number(entity.equipment[stat]) || 0;
+    });
+
+    return entity.equipment;
+  }
+
+  function effectiveStat(entity, stat) {
+    const base = Number(entity[stat]) || 0;
+    const equipment = entity === state.player ? ensureEquipment(entity)[stat] : 0;
+    return Math.max(0, base + equipment);
+  }
+
+  function dexterityModifier(entity) {
+    return clamp(1 + (effectiveStat(entity, "dexterity") - 30) / 200, 0.9, 1.1);
+  }
+
+  function equipmentModifier(entity, stat) {
+    if (entity !== state.player) {
+      return 1;
+    }
+
+    const equipment = ensureEquipment(entity);
+    return clamp(1 + (Number(equipment[stat]) || 0) / 160, 0.9, 1.15);
+  }
+
+  function criticalRate(entity) {
+    return clamp(0.025 + effectiveStat(entity, "dexterity") / 1000, 0.025, 0.07);
+  }
+
+  function calculatePhysicalDamage(attacker, defender, options = {}) {
+    const attackMultiplier = options.attackMultiplier || 1;
+    const attackScore = Math.floor((effectiveStat(attacker, "attack") * attackMultiplier) / 2);
+    const defenseScore = Math.floor(effectiveStat(defender, "defense") / 4);
+    const baseDamage = Math.max(1, attackScore - defenseScore);
+    const dexterityFactor = dexterityModifier(attacker);
+    const equipmentFactor = equipmentModifier(attacker, "attack");
+    const variance = randomInt(94, 106) / 100;
+    const isCritical = Math.random() < criticalRate(attacker);
+    const criticalFactor = isCritical ? 1.8 : 1;
+    const damage = Math.max(
+      1,
+      Math.floor(((baseDamage * dexterityFactor * equipmentFactor * variance * criticalFactor) / 4) + 1),
+    );
+
+    return { damage, isCritical };
+  }
+
+  function calculateMagicHeal(caster) {
+    const wisdomScore = Math.floor(effectiveStat(caster, "wisdom") / 2);
+    const levelScore = Math.floor(caster.level * 3);
+    const baseHeal = Math.max(1, wisdomScore + levelScore);
+    const dexterityFactor = dexterityModifier(caster);
+    const equipmentFactor = equipmentModifier(caster, "wisdom");
+    const variance = randomInt(96, 108) / 100;
+    return Math.max(1, Math.floor(((baseHeal * dexterityFactor * equipmentFactor * variance) / 2) + 6));
+  }
+
+  function adjustedAgility(entity) {
+    const agility = effectiveStat(entity, "agility");
+    const dexterityFactor = dexterityModifier(entity);
+    const variance = randomInt(95, 105) / 100;
+    return agility * dexterityFactor * variance;
+  }
+
+  function playerActsFirst(enemy) {
+    return adjustedAgility(state.player) >= adjustedAgility(enemy);
   }
 
   function ensureInventory(player = state.player) {
@@ -456,44 +614,116 @@
 
     state.mode = "battle";
     state.battle = { enemy, busy: false };
-    battleCommandOpen = false;
+    battleCommandView = "root";
     addLog(`${enemy.name}が現れた。`);
     render();
     focusBattleView();
   }
 
-  async function playerAttack() {
+  function openBattleActionMenu() {
     if (state.mode !== "battle" || isBattleBusy()) {
       return;
     }
 
-    battleCommandOpen = false;
+    battleCommandView = "action";
+    renderHud();
+  }
+
+  function openBattleRootMenu() {
+    if (state.mode !== "battle" || isBattleBusy()) {
+      return;
+    }
+
+    battleCommandView = "root";
+    renderHud();
+  }
+
+  async function runPlayerBattleAction(action) {
+    if (state.mode !== "battle" || isBattleBusy()) {
+      return;
+    }
+
+    const enemy = state.battle.enemy;
+    const playerFirst = playerActsFirst(enemy);
+    battleCommandView = "root";
     setBattleBusy(true);
 
     try {
-      const enemy = state.battle.enemy;
-      const damage = Math.max(1, state.player.attack + randomInt(-2, 2));
-      playSlashSound();
-      await playEffect({ type: "slash", damage }, EFFECT_DURATIONS.slash);
+      if (!playerFirst) {
+        addLog(`${enemy.name}が先に動いた。`);
+        render();
+        await wait(180);
+        await enemyTurn();
 
-      enemy.hp = clamp(enemy.hp - damage, 0, enemy.maxHp);
-      addLog(`攻撃した。${enemy.name}に${damage}ダメージ。`);
+        if (state.mode !== "battle" || !state.battle) {
+          return;
+        }
+      }
 
-      if (enemy.hp <= 0) {
-        playDefeatSound();
-        await playEffect({ type: "defeat" }, EFFECT_DURATIONS.defeat);
-        finishBattle(enemy);
+      await action();
+
+      if (state.mode !== "battle" || !state.battle) {
         return;
       }
 
-      render();
-      await wait(220);
-      await enemyTurn();
+      if (playerFirst) {
+        await wait(220);
+        await enemyTurn();
+      }
     } finally {
       if (state.mode === "battle" && state.battle) {
         setBattleBusy(false);
       }
     }
+  }
+
+  async function playerAttack() {
+    await runPlayerBattleAction(() => executePhysicalPlayerAction({
+      label: "攻撃した",
+      attackMultiplier: 1,
+    }));
+  }
+
+  async function playerFullSlash() {
+    if (state.mode !== "battle" || isBattleBusy()) {
+      return;
+    }
+
+    if (state.player.mp < FULL_SLASH_COST) {
+      addLog("MPが足りない。");
+      render();
+      return;
+    }
+
+    await runPlayerBattleAction(() => executePhysicalPlayerAction({
+      label: "全力斬り",
+      attackMultiplier: 1.5,
+      mpCost: FULL_SLASH_COST,
+    }));
+  }
+
+  async function executePhysicalPlayerAction({ label, attackMultiplier, mpCost = 0 }) {
+    if (mpCost > 0) {
+      state.player.mp = clamp(state.player.mp - mpCost, 0, state.player.maxMp);
+    }
+
+    const enemy = state.battle.enemy;
+    const result = calculatePhysicalDamage(state.player, enemy, { attackMultiplier });
+    playSlashSound();
+    await playEffect({ type: "slash", damage: result.damage }, EFFECT_DURATIONS.slash);
+
+    enemy.hp = clamp(enemy.hp - result.damage, 0, enemy.maxHp);
+    const criticalText = result.isCritical ? "会心の一撃！" : "";
+    addLog(`${label}。${criticalText}${enemy.name}に${result.damage}ダメージ。`);
+
+    if (enemy.hp <= 0) {
+      playDefeatSound();
+      await playEffect({ type: "defeat" }, EFFECT_DURATIONS.defeat);
+      finishBattle(enemy);
+      return;
+    }
+
+    render();
   }
 
   async function playerHeal() {
@@ -513,25 +743,16 @@
       return;
     }
 
-    battleCommandOpen = false;
-    setBattleBusy(true);
-
-    try {
-      const healAmount = 10 + state.player.level * 4;
+    await runPlayerBattleAction(async () => {
+      const healAmount = calculateMagicHeal(state.player);
       const before = state.player.hp;
       state.player.mp = clamp(state.player.mp - HEAL_MAGIC_COST, 0, state.player.maxMp);
       state.player.hp = clamp(state.player.hp + healAmount, 0, state.player.maxHp);
       const recovered = state.player.hp - before;
-      addLog(`回復のまほうを唱えた。HPが${recovered}回復。`);
+      addLog(`回復の魔法を唱えた。HPが${recovered}回復。`);
       playHealSound();
       await playEffect({ type: "heal", amount: recovered }, EFFECT_DURATIONS.heal);
-      await wait(180);
-      await enemyTurn();
-    } finally {
-      if (state.mode === "battle" && state.battle) {
-        setBattleBusy(false);
-      }
-    }
+    });
   }
 
   async function playerUseHerb() {
@@ -552,24 +773,17 @@
       return;
     }
 
-    battleCommandOpen = false;
-    setBattleBusy(true);
-
-    try {
+    await runPlayerBattleAction(async () => {
       const before = state.player.hp;
+      const dexterityFactor = dexterityModifier(state.player);
+      const healAmount = Math.max(1, Math.floor(HERB_HEAL * dexterityFactor));
       inventory.herb -= 1;
-      state.player.hp = clamp(state.player.hp + HERB_HEAL, 0, state.player.maxHp);
+      state.player.hp = clamp(state.player.hp + healAmount, 0, state.player.maxHp);
       const recovered = state.player.hp - before;
       addLog(`薬草を使った。HPが${recovered}回復。`);
       playItemSound();
       await playEffect({ type: "heal", amount: recovered }, EFFECT_DURATIONS.heal);
-      await wait(180);
-      await enemyTurn();
-    } finally {
-      if (state.mode === "battle" && state.battle) {
-        setBattleBusy(false);
-      }
-    }
+    });
   }
 
   async function playerRun() {
@@ -577,18 +791,23 @@
       return;
     }
 
-    battleCommandOpen = false;
+    battleCommandView = "root";
     setBattleBusy(true);
 
     try {
       playRunSound();
       await playEffect({ type: "run" }, EFFECT_DURATIONS.run);
 
-      if (Math.random() < 0.6) {
-        const enemyName = state.battle.enemy.name;
+      const enemy = state.battle.enemy;
+      const agilityGap = effectiveStat(state.player, "agility") - effectiveStat(enemy, "agility");
+      const dexterityBonus = (dexterityModifier(state.player) - 1) * 0.4;
+      const runChance = clamp(0.56 + agilityGap / 220 + dexterityBonus, 0.35, 0.76);
+
+      if (Math.random() < runChance) {
+        const enemyName = enemy.name;
         state.mode = "explore";
         state.battle = null;
-        battleCommandOpen = false;
+        battleCommandView = "root";
         addLog(`${enemyName}から逃げ切った。`);
         render();
         return;
@@ -610,12 +829,13 @@
     }
 
     const enemy = state.battle.enemy;
-    const damage = Math.max(1, enemy.attack + randomInt(-1, 2));
+    const result = calculatePhysicalDamage(enemy, state.player);
     playHitSound();
-    await playEffect({ type: "enemyAttack", damage }, EFFECT_DURATIONS.enemyAttack);
+    await playEffect({ type: "enemyAttack", damage: result.damage }, EFFECT_DURATIONS.enemyAttack);
 
-    state.player.hp = clamp(state.player.hp - damage, 0, state.player.maxHp);
-    addLog(`${enemy.name}の攻撃。${damage}ダメージ。`);
+    state.player.hp = clamp(state.player.hp - result.damage, 0, state.player.maxHp);
+    const criticalText = result.isCritical ? "痛恨の一撃！" : "";
+    addLog(`${enemy.name}の攻撃。${criticalText}${result.damage}ダメージ。`);
 
     if (state.player.hp <= 0) {
       await wait(260);
@@ -629,7 +849,7 @@
   function finishBattle(enemy) {
     state.mode = "explore";
     state.battle = null;
-    battleCommandOpen = false;
+    battleCommandView = "root";
     state.player.gold += enemy.gold;
     addLog(`${enemy.name}を倒した。${enemy.exp}EXP と ${enemy.gold}G を得た。`);
     gainExp(enemy.exp);
@@ -645,7 +865,11 @@
       state.player.level += 1;
       state.player.maxHp += 8 + state.player.level;
       state.player.maxMp += 3 + Math.floor(state.player.level / 2);
-      state.player.attack += 2;
+      state.player.attack += 5;
+      state.player.defense += 4;
+      state.player.wisdom += 4;
+      state.player.agility += 3;
+      state.player.dexterity += 3;
       state.player.nextExp = Math.floor(state.player.nextExp * 1.45 + 6);
       state.player.hp = state.player.maxHp;
       state.player.mp = state.player.maxMp;
@@ -784,7 +1008,7 @@
     state.player.y = 10;
     state.mode = "explore";
     state.battle = null;
-    battleCommandOpen = false;
+    battleCommandView = "root";
     addLog(`力尽きた。町で目を覚ました。-${lostGold}G`);
     render();
   }
@@ -797,7 +1021,7 @@
     }
 
     const payload = {
-      version: 2,
+      version: 3,
       savedAt: new Date().toISOString(),
       mapId: state.mapId,
       player: state.player,
@@ -836,11 +1060,21 @@
       return;
     }
 
+    const loadedLevel = payload.player.level;
+    const statDefaults = defaultBattleStats(loadedLevel);
+    const isLegacyStats = !Number.isFinite(payload.player.defense);
     const loadedMaxMp = Number.isFinite(payload.player.maxMp) ? payload.player.maxMp : 10;
     const loadedMp = Number.isFinite(payload.player.mp) ? payload.player.mp : loadedMaxMp;
     const savedHerb = payload.player.inventory?.herb;
     const loadedInventory = {
       herb: Number.isFinite(savedHerb) ? Math.max(0, savedHerb) : 1,
+    };
+    const loadedEquipment = {
+      attack: Number(payload.player.equipment?.attack) || 0,
+      defense: Number(payload.player.equipment?.defense) || 0,
+      wisdom: Number(payload.player.equipment?.wisdom) || 0,
+      agility: Number(payload.player.equipment?.agility) || 0,
+      dexterity: Number(payload.player.equipment?.dexterity) || 0,
     };
 
     state = {
@@ -855,10 +1089,17 @@
         maxHp: payload.player.maxHp,
         mp: clamp(loadedMp, 0, loadedMaxMp),
         maxMp: loadedMaxMp,
-        attack: payload.player.attack,
+        attack: isLegacyStats
+          ? Math.max(statDefaults.attack, (Number(payload.player.attack) || 6) * 6 + 10)
+          : payload.player.attack,
+        defense: Number.isFinite(payload.player.defense) ? payload.player.defense : statDefaults.defense,
+        wisdom: Number.isFinite(payload.player.wisdom) ? payload.player.wisdom : statDefaults.wisdom,
+        agility: Number.isFinite(payload.player.agility) ? payload.player.agility : statDefaults.agility,
+        dexterity: Number.isFinite(payload.player.dexterity) ? payload.player.dexterity : statDefaults.dexterity,
         exp: payload.player.exp,
         nextExp: payload.player.nextExp,
         gold: payload.player.gold,
+        equipment: loadedEquipment,
         inventory: loadedInventory,
       },
       npcTalkIndex: payload.npcTalkIndex || {},
@@ -867,13 +1108,13 @@
       steps: payload.steps || 0,
     };
 
-    battleCommandOpen = false;
+    battleCommandView = "root";
     addLog("ロードした。");
     render();
   }
 
   function isValidSave(payload) {
-    if (!payload || ![1, 2].includes(payload.version)) {
+    if (!payload || ![1, 2, 3].includes(payload.version)) {
       return false;
     }
 
@@ -891,6 +1132,10 @@
       Number.isFinite(player.mp) ? player.mp : 0,
       Number.isFinite(player.maxMp) ? player.maxMp : 10,
       player.attack,
+      Number.isFinite(player.defense) ? player.defense : 1,
+      Number.isFinite(player.wisdom) ? player.wisdom : 1,
+      Number.isFinite(player.agility) ? player.agility : 1,
+      Number.isFinite(player.dexterity) ? player.dexterity : 1,
       player.exp,
       player.nextExp,
       player.gold,
@@ -905,7 +1150,7 @@
     }
 
     state = createInitialState();
-    battleCommandOpen = false;
+    battleCommandView = "root";
     addLog("新しく冒険を始めた。");
     render();
   }
@@ -1204,10 +1449,18 @@
     ctx.fillStyle = "#fffaf1";
     ctx.font = "bold 15px sans-serif";
     ctx.textAlign = "left";
+
+    if (battleCommandView === "action") {
+      ctx.fillText("攻撃", 370, 298);
+      ctx.fillText("特技", 370, 324);
+      ctx.fillText("魔法", 430, 298);
+      ctx.fillText("戻る", 430, 324);
+      return;
+    }
+
     ctx.fillText("たたかう", 370, 298);
-    ctx.fillText("まほう", 370, 324);
-    ctx.fillText("どうぐ", 430, 298);
-    ctx.fillText("にげる", 430, 324);
+    ctx.fillText("どうぐ", 370, 324);
+    ctx.fillText("にげる", 430, 298);
   }
 
   function drawRetroWindow(x, y, width, height) {
@@ -1423,7 +1676,11 @@
     ui.modeValue.textContent = busy ? "演出中" : isBattle ? "戦闘中" : "探索中";
     ui.modeValue.classList.toggle("battle", isBattle);
     ui.levelValue.textContent = player.level;
-    ui.attackValue.textContent = player.attack;
+    ui.attackValue.textContent = effectiveStat(player, "attack");
+    ui.defenseValue.textContent = effectiveStat(player, "defense");
+    ui.wisdomValue.textContent = effectiveStat(player, "wisdom");
+    ui.agilityValue.textContent = effectiveStat(player, "agility");
+    ui.dexterityValue.textContent = effectiveStat(player, "dexterity");
     ui.goldValue.textContent = player.gold;
     ui.herbValue.textContent = herbCount;
     ui.hpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
@@ -1444,20 +1701,38 @@
       ui.enemyHpBar.style.width = `${(enemy.hp / enemy.maxHp) * 100}%`;
     }
 
+    ui.exploreCommandGrid.hidden = isBattle;
+    ui.battleRootMenu.hidden = !isBattle || battleCommandView !== "root";
+    ui.battleActionMenu.hidden = !isBattle || battleCommandView !== "action";
     ui.interactButton.disabled = state.mode !== "explore" || busy;
+    ui.fightButton.disabled = !isBattle || busy;
     ui.attackButton.disabled = !isBattle || busy;
-    ui.healButton.disabled = !isBattle || busy || player.mp < HEAL_MAGIC_COST;
+    ui.skillButton.disabled = !isBattle || busy || player.mp < FULL_SLASH_COST;
+    ui.magicButton.disabled = !isBattle || busy || player.mp < HEAL_MAGIC_COST;
+    ui.backButton.disabled = !isBattle || busy;
     ui.itemButton.disabled = !isBattle || busy || herbCount <= 0;
     ui.runButton.disabled = !isBattle || busy;
     ui.saveButton.disabled = isBattle || busy;
     ui.loadButton.disabled = busy;
     ui.resetButton.disabled = busy;
     ui.touchBattleStatus.hidden = !isBattle;
-    ui.touchInteractButton.textContent = isBattle ? "コマンド" : "決定";
+    ui.touchInteractButton.hidden = isBattle;
+    ui.touchInteractButton.textContent = "決定";
     ui.touchInteractButton.disabled = busy || (!isBattle && state.mode !== "explore");
-    ui.battleTouchMenu.hidden = !isBattle || !battleCommandOpen || busy;
+    ui.battleTouchMenu.hidden = !isBattle || busy;
+    ui.battleTouchMenu.classList.toggle("action-menu", battleCommandView === "action");
+    ui.touchFightButton.hidden = battleCommandView !== "root";
+    ui.touchItemButton.hidden = battleCommandView !== "root";
+    ui.touchRunButton.hidden = battleCommandView !== "root";
+    ui.touchAttackButton.hidden = battleCommandView !== "action";
+    ui.touchSkillButton.hidden = battleCommandView !== "action";
+    ui.touchMagicButton.hidden = battleCommandView !== "action";
+    ui.touchBackButton.hidden = battleCommandView !== "action";
+    ui.touchFightButton.disabled = !isBattle || busy;
     ui.touchAttackButton.disabled = !isBattle || busy;
-    ui.touchHealButton.disabled = !isBattle || busy || player.mp < HEAL_MAGIC_COST;
+    ui.touchSkillButton.disabled = !isBattle || busy || player.mp < FULL_SLASH_COST;
+    ui.touchMagicButton.disabled = !isBattle || busy || player.mp < HEAL_MAGIC_COST;
+    ui.touchBackButton.disabled = !isBattle || busy;
     ui.touchItemButton.disabled = !isBattle || busy || herbCount <= 0;
     ui.touchRunButton.disabled = !isBattle || busy;
     ui.touchMoveButtons.forEach((button) => {
@@ -1484,14 +1759,22 @@
     }
 
     if (state.mode === "battle") {
-      if (event.key === "1") {
+      if (battleCommandView === "root") {
+        if (event.key === "1") {
+          openBattleActionMenu();
+        } else if (event.key === "2") {
+          playerUseHerb();
+        } else if (event.key === "3") {
+          playerRun();
+        }
+      } else if (event.key === "1") {
         playerAttack();
       } else if (event.key === "2") {
-        playerHeal();
+        playerFullSlash();
       } else if (event.key === "3") {
-        playerUseHerb();
-      } else if (event.key === "4") {
-        playerRun();
+        playerHeal();
+      } else if (event.key === "4" || event.key === "Escape") {
+        openBattleRootMenu();
       }
       return;
     }
@@ -1527,16 +1810,6 @@
   }
 
   function handleTouchAction() {
-    if (state.mode === "battle") {
-      if (isBattleBusy()) {
-        return;
-      }
-
-      battleCommandOpen = !battleCommandOpen;
-      renderHud();
-      return;
-    }
-
     interact();
   }
 
@@ -1568,16 +1841,22 @@
     window.addEventListener("pointercancel", stopTouchMove);
     window.addEventListener("blur", stopTouchMove);
     ui.interactButton.addEventListener("click", interact);
+    ui.fightButton.addEventListener("click", openBattleActionMenu);
     ui.attackButton.addEventListener("click", playerAttack);
-    ui.healButton.addEventListener("click", playerHeal);
+    ui.skillButton.addEventListener("click", playerFullSlash);
+    ui.magicButton.addEventListener("click", playerHeal);
+    ui.backButton.addEventListener("click", openBattleRootMenu);
     ui.itemButton.addEventListener("click", playerUseHerb);
     ui.runButton.addEventListener("click", playerRun);
     ui.saveButton.addEventListener("click", saveGame);
     ui.loadButton.addEventListener("click", loadGame);
     ui.resetButton.addEventListener("click", resetGame);
     ui.touchInteractButton.addEventListener("click", handleTouchAction);
+    ui.touchFightButton.addEventListener("click", openBattleActionMenu);
     ui.touchAttackButton.addEventListener("click", playerAttack);
-    ui.touchHealButton.addEventListener("click", playerHeal);
+    ui.touchSkillButton.addEventListener("click", playerFullSlash);
+    ui.touchMagicButton.addEventListener("click", playerHeal);
+    ui.touchBackButton.addEventListener("click", openBattleRootMenu);
     ui.touchItemButton.addEventListener("click", playerUseHerb);
     ui.touchRunButton.addEventListener("click", playerRun);
     ui.touchMoveButtons.forEach((button) => {
