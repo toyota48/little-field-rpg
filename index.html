@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Little Field RPG</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%232f7d6b'/%3E%3Cpath d='M8 23h16v4H8zM10 8h12v15H10z' fill='%23fffaf1'/%3E%3Cpath d='M14 11h4v4h-4z' fill='%23b84f42'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./game.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">2D Browser RPG</p>
+          <h1>Little Field RPG</h1>
+        </div>
+        <div class="save-controls" aria-label="save controls">
+          <button id="saveButton" type="button">セーブ</button>
+          <button id="loadButton" type="button">ロード</button>
+          <button id="resetButton" type="button" class="subtle">最初から</button>
+        </div>
+      </header>
+
+      <section class="game-layout" aria-label="game area">
+        <div class="playfield">
+          <canvas id="gameCanvas" width="512" height="384" aria-label="game screen"></canvas>
+          <section class="touch-controls" aria-label="mobile movement controls">
+            <div class="dpad" aria-label="movement pad">
+              <button class="touch-button dpad-up" type="button" data-move="up" aria-label="上へ移動">▲</button>
+              <button class="touch-button dpad-left" type="button" data-move="left" aria-label="左へ移動">◀</button>
+              <button class="touch-button dpad-right" type="button" data-move="right" aria-label="右へ移動">▶</button>
+              <button class="touch-button dpad-down" type="button" data-move="down" aria-label="下へ移動">▼</button>
+            </div>
+            <button id="touchInteractButton" class="touch-button touch-action" type="button">決定</button>
+          </section>
+        </div>
+
+        <aside class="hud" aria-label="status and commands">
+          <section class="panel status-panel">
+            <div class="panel-heading">
+              <h2>ステータス</h2>
+              <span id="modeValue" class="mode-pill">探索中</span>
+            </div>
+
+            <dl class="stats-grid">
+              <div>
+                <dt>マップ</dt>
+                <dd id="mapValue">町</dd>
+              </div>
+              <div>
+                <dt>Lv</dt>
+                <dd id="levelValue">1</dd>
+              </div>
+              <div>
+                <dt>攻撃力</dt>
+                <dd id="attackValue">6</dd>
+              </div>
+              <div>
+                <dt>お金</dt>
+                <dd><span id="goldValue">0</span> G</dd>
+              </div>
+            </dl>
+
+            <div class="meter-row">
+              <span id="hpText">HP 30 / 30</span>
+              <div class="meter hp-meter" aria-hidden="true">
+                <span id="hpBar"></span>
+              </div>
+            </div>
+
+            <div class="meter-row">
+              <span id="expText">EXP 0 / 12</span>
+              <div class="meter exp-meter" aria-hidden="true">
+                <span id="expBar"></span>
+              </div>
+            </div>
+          </section>
+
+          <section id="enemyPanel" class="panel enemy-panel" hidden>
+            <div class="panel-heading">
+              <h2 id="enemyName">敵</h2>
+              <span id="enemyHpText">HP 0 / 0</span>
+            </div>
+            <div class="meter enemy-meter" aria-hidden="true">
+              <span id="enemyHpBar"></span>
+            </div>
+          </section>
+
+          <section class="panel command-panel">
+            <h2>コマンド</h2>
+            <div class="command-grid">
+              <button id="interactButton" type="button">決定</button>
+              <button id="attackButton" type="button">攻撃</button>
+              <button id="healButton" type="button">回復</button>
+              <button id="runButton" type="button">逃げる</button>
+            </div>
+          </section>
+
+          <section class="panel log-panel">
+            <h2>ログ</h2>
+            <ul id="logList" aria-live="polite"></ul>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
