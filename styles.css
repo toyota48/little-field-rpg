@@ -209,6 +209,22 @@ h2 {
   border-color: #7f312a;
 }
 
+.battle-touch-menu {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.battle-touch-menu[hidden] {
+  display: none !important;
+}
+
+.battle-command {
+  min-height: 58px;
+  padding: 0 8px;
+}
+
 .hud {
   display: grid;
   gap: 12px;
@@ -340,6 +356,10 @@ dd {
 }
 
 @media (max-width: 880px) {
+  body.battle-focus {
+    overflow: hidden;
+  }
+
   .app-shell {
     width: min(100% - 20px, 560px);
     padding: 18px 0;
@@ -364,6 +384,54 @@ dd {
     align-items: center;
     gap: 14px;
     padding: 4px 2px 2px;
+  }
+
+  body.battle-focus .app-shell {
+    width: 100%;
+    min-height: 100dvh;
+    padding: 0;
+  }
+
+  body.battle-focus .topbar,
+  body.battle-focus .hud {
+    display: none;
+  }
+
+  body.battle-focus .game-layout {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  body.battle-focus .playfield {
+    min-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+    align-content: start;
+    background: var(--panel);
+  }
+
+  body.battle-focus #gameCanvas {
+    width: 100%;
+    max-height: min(58dvh, 420px);
+    object-fit: contain;
+  }
+
+  body.battle-focus .touch-controls {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 0;
+  }
+
+  body.battle-focus .dpad {
+    display: none;
+  }
+
+  body.battle-focus .touch-action {
+    width: 100%;
+    min-height: 64px;
+    justify-self: stretch;
   }
 }
 
@@ -391,5 +459,13 @@ dd {
 
   .touch-action {
     width: 180px;
+  }
+
+  body.battle-focus .touch-action {
+    width: 100%;
+  }
+
+  body.battle-focus .battle-touch-menu {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

@@ -45,6 +45,10 @@
     resetButton: document.getElementById("resetButton"),
     touchInteractButton: document.getElementById("touchInteractButton"),
     touchMoveButtons: [...document.querySelectorAll("[data-move]")],
+    battleTouchMenu: document.getElementById("battleTouchMenu"),
+    touchAttackButton: document.getElementById("touchAttackButton"),
+    touchHealButton: document.getElementById("touchHealButton"),
+    touchRunButton: document.getElementById("touchRunButton"),
   };
 
   const TILES = {
@@ -178,6 +182,7 @@
   let state = createInitialState();
   let touchMoveTimer = null;
   let touchMoveInterval = null;
+  let battleCommandOpen = false;
 
   function createInitialState() {
     return {
@@ -374,8 +379,10 @@
 
     state.mode = "battle";
     state.battle = { enemy, busy: false };
+    battleCommandOpen = false;
     addLog(`${enemy.name}が現れた。`);
     render();
+    focusBattleView();
   }
 
   async function playerAttack() {
@@ -383,6 +390,7 @@
       return;
     }
 
+    battleCommandOpen = false;
     setBattleBusy(true);
 
     try {
@@ -416,6 +424,7 @@
       return;
     }
 
+    battleCommandOpen = false;
     setBattleBusy(true);
 
     try {
@@ -440,6 +449,7 @@
       return;
     }
 
+    battleCommandOpen = false;
     setBattleBusy(true);
 
     try {
@@ -450,6 +460,7 @@
         const enemyName = state.battle.enemy.name;
         state.mode = "explore";
         state.battle = null;
+        battleCommandOpen = false;
         addLog(`${enemyName}から逃げ切った。`);
         render();
         return;
@@ -490,6 +501,7 @@
   function finishBattle(enemy) {
     state.mode = "explore";
     state.battle = null;
+    battleCommandOpen = false;
     state.player.gold += enemy.gold;
     addLog(`${enemy.name}を倒した。${enemy.exp}EXP と ${enemy.gold}G を得た。`);
     gainExp(enemy.exp);
@@ -636,6 +648,7 @@
     state.player.y = 10;
     state.mode = "explore";
     state.battle = null;
+    battleCommandOpen = false;
     addLog(`力尽きた。町で目を覚ました。-${lostGold}G`);
     render();
   }
@@ -706,6 +719,7 @@
       steps: payload.steps || 0,
     };
 
+    battleCommandOpen = false;
     addLog("ロードした。");
     render();
   }
@@ -741,6 +755,7 @@
     }
 
     state = createInitialState();
+    battleCommandOpen = false;
     addLog("新しく冒険を始めた。");
     render();
   }
@@ -900,27 +915,27 @@
     const enemyAlpha = effect?.type === "defeat" ? 1 - effect.progress : 1;
 
     ctx.fillStyle = "rgba(255, 250, 241, 0.96)";
-    roundRect(centerX - 118, centerY - 96, 236, 180, 8);
+    roundRect(centerX - 150, centerY - 116, 300, 220, 8);
     ctx.fill();
 
     ctx.save();
     ctx.globalAlpha = enemyAlpha;
     ctx.translate(enemyJolt, 0);
     ctx.fillStyle = enemy.color;
-    ctx.fillRect(centerX - 34, centerY - 42, 68, 54);
+    ctx.fillRect(centerX - 44, centerY - 58, 88, 70);
     ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
-    ctx.fillRect(centerX - 22, centerY - 31, 16, 12);
+    ctx.fillRect(centerX - 30, centerY - 44, 20, 15);
     ctx.fillStyle = "#1f2326";
-    ctx.fillRect(centerX - 16, centerY - 16, 5, 5);
-    ctx.fillRect(centerX + 11, centerY - 16, 5, 5);
+    ctx.fillRect(centerX - 20, centerY - 24, 6, 6);
+    ctx.fillRect(centerX + 14, centerY - 24, 6, 6);
     ctx.restore();
 
     ctx.fillStyle = "#24312f";
-    ctx.font = "bold 18px sans-serif";
+    ctx.font = "bold 22px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(enemy.name, centerX, centerY + 44);
-    ctx.font = "14px sans-serif";
-    ctx.fillText(`HP ${enemy.hp} / ${enemy.maxHp}`, centerX, centerY + 68);
+    ctx.fillText(enemy.name, centerX, centerY + 48);
+    ctx.font = "16px sans-serif";
+    ctx.fillText(`HP ${enemy.hp} / ${enemy.maxHp}`, centerX, centerY + 76);
 
     if (effect) {
       drawBattleEffect(effect, centerX, centerY);
@@ -1101,12 +1116,14 @@
     const player = state.player;
     const enemy = state.battle?.enemy;
     const busy = isBattleBusy();
+    const isBattle = state.mode === "battle";
     const hpRatio = (player.hp / player.maxHp) * 100;
     const expRatio = (player.exp / player.nextExp) * 100;
 
+    document.body.classList.toggle("battle-focus", isBattle);
     ui.mapValue.textContent = currentMap().name;
-    ui.modeValue.textContent = busy ? "演出中" : state.mode === "battle" ? "戦闘中" : "探索中";
-    ui.modeValue.classList.toggle("battle", state.mode === "battle");
+    ui.modeValue.textContent = busy ? "演出中" : isBattle ? "戦闘中" : "探索中";
+    ui.modeValue.classList.toggle("battle", isBattle);
     ui.levelValue.textContent = player.level;
     ui.attackValue.textContent = player.attack;
     ui.goldValue.textContent = player.gold;
@@ -1123,13 +1140,18 @@
     }
 
     ui.interactButton.disabled = state.mode !== "explore" || busy;
-    ui.attackButton.disabled = state.mode !== "battle" || busy;
-    ui.healButton.disabled = state.mode !== "battle" || busy;
-    ui.runButton.disabled = state.mode !== "battle" || busy;
-    ui.saveButton.disabled = state.mode === "battle" || busy;
+    ui.attackButton.disabled = !isBattle || busy;
+    ui.healButton.disabled = !isBattle || busy;
+    ui.runButton.disabled = !isBattle || busy;
+    ui.saveButton.disabled = isBattle || busy;
     ui.loadButton.disabled = busy;
     ui.resetButton.disabled = busy;
-    ui.touchInteractButton.disabled = state.mode !== "explore" || busy;
+    ui.touchInteractButton.textContent = isBattle ? "コマンド" : "決定";
+    ui.touchInteractButton.disabled = busy || (!isBattle && state.mode !== "explore");
+    ui.battleTouchMenu.hidden = !isBattle || !battleCommandOpen || busy;
+    ui.touchAttackButton.disabled = !isBattle || busy;
+    ui.touchHealButton.disabled = !isBattle || busy;
+    ui.touchRunButton.disabled = !isBattle || busy;
     ui.touchMoveButtons.forEach((button) => {
       button.disabled = state.mode !== "explore" || busy;
     });
@@ -1194,6 +1216,30 @@
     }, 280);
   }
 
+  function handleTouchAction() {
+    if (state.mode === "battle") {
+      if (isBattleBusy()) {
+        return;
+      }
+
+      battleCommandOpen = !battleCommandOpen;
+      renderHud();
+      return;
+    }
+
+    interact();
+  }
+
+  function focusBattleView() {
+    if (!window.matchMedia("(max-width: 880px)").matches) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 0);
+  }
+
   function stopTouchMove() {
     if (touchMoveTimer) {
       window.clearTimeout(touchMoveTimer);
@@ -1218,7 +1264,10 @@
     ui.saveButton.addEventListener("click", saveGame);
     ui.loadButton.addEventListener("click", loadGame);
     ui.resetButton.addEventListener("click", resetGame);
-    ui.touchInteractButton.addEventListener("click", interact);
+    ui.touchInteractButton.addEventListener("click", handleTouchAction);
+    ui.touchAttackButton.addEventListener("click", playerAttack);
+    ui.touchHealButton.addEventListener("click", playerHeal);
+    ui.touchRunButton.addEventListener("click", playerRun);
     ui.touchMoveButtons.forEach((button) => {
       button.addEventListener("pointerdown", handleTouchMoveStart);
       button.addEventListener("pointerleave", stopTouchMove);
