@@ -32,6 +32,12 @@
               <button class="touch-button dpad-right" type="button" data-move="right" aria-label="右へ移動">▶</button>
               <button class="touch-button dpad-down" type="button" data-move="down" aria-label="下へ移動">▼</button>
             </div>
+            <div id="touchBattleStatus" class="touch-battle-status" aria-live="polite" hidden>
+              <span id="touchHpText">HP 30 / 30</span>
+              <div class="touch-hp-meter" aria-hidden="true">
+                <span id="touchHpBar"></span>
+              </div>
+            </div>
             <button id="touchInteractButton" class="touch-button touch-action" type="button">決定</button>
             <div id="battleTouchMenu" class="battle-touch-menu" hidden>
               <button id="touchAttackButton" class="battle-command" type="button">攻撃</button>

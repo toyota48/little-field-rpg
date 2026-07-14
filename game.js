@@ -45,6 +45,9 @@
     resetButton: document.getElementById("resetButton"),
     touchInteractButton: document.getElementById("touchInteractButton"),
     touchMoveButtons: [...document.querySelectorAll("[data-move]")],
+    touchBattleStatus: document.getElementById("touchBattleStatus"),
+    touchHpText: document.getElementById("touchHpText"),
+    touchHpBar: document.getElementById("touchHpBar"),
     battleTouchMenu: document.getElementById("battleTouchMenu"),
     touchAttackButton: document.getElementById("touchAttackButton"),
     touchHealButton: document.getElementById("touchHealButton"),
@@ -1129,6 +1132,8 @@
     ui.goldValue.textContent = player.gold;
     ui.hpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
     ui.hpBar.style.width = `${hpRatio}%`;
+    ui.touchHpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
+    ui.touchHpBar.style.width = `${hpRatio}%`;
     ui.expText.textContent = `EXP ${player.exp} / ${player.nextExp}`;
     ui.expBar.style.width = `${expRatio}%`;
 
@@ -1146,6 +1151,7 @@
     ui.saveButton.disabled = isBattle || busy;
     ui.loadButton.disabled = busy;
     ui.resetButton.disabled = busy;
+    ui.touchBattleStatus.hidden = !isBattle;
     ui.touchInteractButton.textContent = isBattle ? "コマンド" : "決定";
     ui.touchInteractButton.disabled = busy || (!isBattle && state.mode !== "explore");
     ui.battleTouchMenu.hidden = !isBattle || !battleCommandOpen || busy;

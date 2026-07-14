@@ -209,6 +209,33 @@ h2 {
   border-color: #7f312a;
 }
 
+.touch-battle-status {
+  display: none;
+}
+
+.touch-battle-status[hidden] {
+  display: none !important;
+}
+
+.touch-hp-meter {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid #9f9a8d;
+  border-radius: 999px;
+  background: #ded8ca;
+}
+
+.touch-hp-meter span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--danger);
+  transition: width 160ms ease;
+}
+
 .battle-touch-menu {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -426,6 +453,18 @@ dd {
 
   body.battle-focus .dpad {
     display: none;
+  }
+
+  body.battle-focus .touch-battle-status {
+    display: grid;
+    gap: 7px;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #dfd1b9;
+    border-radius: 8px;
+    background: #fffdf8;
+    color: var(--ink);
+    font-weight: 800;
   }
 
   body.battle-focus .touch-action {
