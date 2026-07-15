@@ -35,7 +35,12 @@
           <button id="menuResetButton" type="button" class="subtle">最初から</button>
         </div>
 
-        <section class="mobile-status-panel" aria-label="mobile status">
+        <div class="mobile-menu-tabs" role="tablist" aria-label="menu tabs">
+          <button id="mobileStatusTab" type="button" role="tab" aria-selected="true">ステータス</button>
+          <button id="mobileItemsTab" type="button" role="tab" aria-selected="false">アイテム</button>
+        </div>
+
+        <section id="mobileStatusPanel" class="mobile-status-panel menu-tab-panel" aria-label="mobile status">
           <div class="panel-heading">
             <h2>ステータス</h2>
             <span id="mobileModeValue" class="mode-pill">探索中</span>
@@ -103,6 +108,35 @@
             <div class="meter exp-meter" aria-hidden="true">
               <span id="mobileExpBar"></span>
             </div>
+          </div>
+
+          <section class="ability-detail-panel" aria-label="ability details">
+            <h3>能力詳細</h3>
+            <dl id="mobileAbilityDetails" class="ability-detail-list"></dl>
+          </section>
+        </section>
+
+        <section id="mobileItemsPanel" class="mobile-items-panel menu-tab-panel" aria-label="mobile items" hidden>
+          <div class="item-category-tabs" role="tablist" aria-label="item categories">
+            <button id="itemEquipmentTab" type="button" role="tab" aria-selected="true">装備品</button>
+            <button id="itemToolsTab" type="button" role="tab" aria-selected="false">道具</button>
+            <button id="itemKeyTab" type="button" role="tab" aria-selected="false">大切なもの</button>
+          </div>
+
+          <div class="inventory-layout">
+            <div id="itemList" class="item-list" aria-label="item list"></div>
+            <article id="itemDetail" class="item-detail" aria-label="item detail" hidden>
+              <div id="itemIcon" class="item-icon" aria-hidden="true"></div>
+              <div>
+                <h3 id="itemName">アイテム</h3>
+                <p id="itemDescription"></p>
+              </div>
+              <div class="item-action-row">
+                <button id="itemUseButton" type="button">使う</button>
+                <button id="itemDropButton" type="button" class="subtle">捨てる</button>
+                <button id="itemBackButton" type="button" class="subtle">戻る</button>
+              </div>
+            </article>
           </div>
         </section>
       </section>

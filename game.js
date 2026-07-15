@@ -2,16 +2,31 @@
   "use strict";
 
   const TILE_SIZE = 32;
-  const MAP_COLS = 16;
-  const MAP_ROWS = 12;
+  const VIEW_COLS = 16;
+  const VIEW_ROWS = 12;
   const SAVE_KEY = "little-field-rpg-save-v1";
-  const SAVE_VERSION = 5;
+  const SAVE_VERSION = 6;
   const INN_PRICE = 5;
   const HEAL_MAGIC_COST = 3;
   const FULL_SLASH_COST = 3;
   const TOUCH_HOLD_INITIAL_DELAY = 220;
   const TOUCH_HOLD_REPEAT_DELAY = 145;
   const HERB_HEAL = 18;
+  const TOOL_ITEMS = {
+    herb: {
+      name: "薬草",
+      description: "旅人の定番薬。HPを少し回復する。",
+      icon: "薬",
+      sellable: true,
+    },
+  };
+  const KEY_ITEMS = {
+    worldMap: {
+      name: "旅の地図",
+      description: "村人から受け取った地図。町、草原、森、洞窟への道が描かれている。",
+      icon: "地",
+    },
+  };
   const EFFECT_DURATIONS = {
     slash: 360,
     enemyAttack: 420,
@@ -200,6 +215,21 @@
     menuSaveButton: document.getElementById("menuSaveButton"),
     menuLoadButton: document.getElementById("menuLoadButton"),
     menuResetButton: document.getElementById("menuResetButton"),
+    mobileStatusTab: document.getElementById("mobileStatusTab"),
+    mobileItemsTab: document.getElementById("mobileItemsTab"),
+    mobileStatusPanel: document.getElementById("mobileStatusPanel"),
+    mobileItemsPanel: document.getElementById("mobileItemsPanel"),
+    itemEquipmentTab: document.getElementById("itemEquipmentTab"),
+    itemToolsTab: document.getElementById("itemToolsTab"),
+    itemKeyTab: document.getElementById("itemKeyTab"),
+    itemList: document.getElementById("itemList"),
+    itemDetail: document.getElementById("itemDetail"),
+    itemIcon: document.getElementById("itemIcon"),
+    itemName: document.getElementById("itemName"),
+    itemDescription: document.getElementById("itemDescription"),
+    itemUseButton: document.getElementById("itemUseButton"),
+    itemDropButton: document.getElementById("itemDropButton"),
+    itemBackButton: document.getElementById("itemBackButton"),
     mobileMapValue: document.getElementById("mobileMapValue"),
     mobileModeValue: document.getElementById("mobileModeValue"),
     mobileLevelValue: document.getElementById("mobileLevelValue"),
@@ -217,6 +247,7 @@
     mobileMpBar: document.getElementById("mobileMpBar"),
     mobileExpText: document.getElementById("mobileExpText"),
     mobileExpBar: document.getElementById("mobileExpBar"),
+    mobileAbilityDetails: document.getElementById("mobileAbilityDetails"),
   };
 
   const TILES = {
@@ -261,11 +292,63 @@
           xMax: 9,
           y: 11,
           to: "grassland",
-          spawn: { x: 7, y: 1 },
+          spawn: { x: 11, y: 1 },
           message: "草原に出た。",
         },
       ],
       entities: [
+        {
+          id: "village-house-door",
+          kind: "door",
+          name: "民家",
+          x: 12,
+          y: 5,
+          to: "villageHouse",
+          spawn: { x: 7, y: 10 },
+          message: "民家に入った。",
+        },
+        {
+          id: "item-shopkeeper",
+          kind: "shop",
+          shopType: "item",
+          name: "道具屋",
+          x: 10,
+          y: 5,
+          body: "#3f7e4d",
+          hair: "#273142",
+        },
+        {
+          id: "equipment-shopkeeper",
+          kind: "shop",
+          shopType: "equipment",
+          name: "装備屋",
+          x: 13,
+          y: 5,
+          body: "#6c6875",
+          hair: "#2e2a23",
+        },
+        {
+          id: "cartographer",
+          kind: "mapGiver",
+          name: "地図好きの村人",
+          x: 10,
+          y: 8,
+          body: "#5b8fc0",
+          hair: "#5b3f2e",
+        },
+        {
+          id: "trade-villager",
+          kind: "npc",
+          name: "商人",
+          x: 12,
+          y: 8,
+          body: "#b87333",
+          hair: "#273142",
+          messages: [
+            "商人「草原の東道は、ゴブリンのギャングが支配しているせいで隣町との交易が途絶えているんだ。」",
+            "商人「腕に自信がついたら、草原の奥で親分を探してみてくれないか。」",
+          ],
+        },
         {
           id: "luca",
           kind: "npc",
@@ -305,38 +388,87 @@
         },
       ],
     },
+    villageHouse: {
+      name: "民家",
+      encounters: [],
+      tiles: [
+        "################",
+        "#IIIIIIIIIIIIII#",
+        "#IIIIIIIIIIIIII#",
+        "#IIIIICCCCIIIII#",
+        "#IIIIIIIIIIIIII#",
+        "#IIIII####IIIII#",
+        "#IIIII#II#IIIII#",
+        "#IIIII#II#IIIII#",
+        "#IIIIIIIIIIIIII#",
+        "#IIIIIIIIIIIIII#",
+        "#IIIIIIIIIIDIII#",
+        "#######DD#######",
+      ],
+      exits: [
+        {
+          xMin: 7,
+          xMax: 8,
+          y: 11,
+          to: "town",
+          spawn: { x: 12, y: 6 },
+          message: "外に出た。",
+        },
+      ],
+      entities: [
+        {
+          id: "house-elder",
+          kind: "npc",
+          name: "村の古老",
+          x: 7,
+          y: 4,
+          body: "#7b4ea3",
+          hair: "#c7c0af",
+          messages: [
+            "古老「魔王の影は、道を知る者から自由を奪う。地図を持って旅をしなされ。」",
+            "古老「店で装備を整え、薬草を持ってから草原に出るとよい。」",
+          ],
+        },
+      ],
+    },
     grassland: {
       name: "草原",
       encounters: ["slime", "wolf", "wasp", "spirit"],
       tiles: [
-        "TTTTTTPPPPTTTTTT",
-        "TGGGGGPPGGGGGGGT",
-        "TGGFFGPPGGGFGGGT",
-        "TGGGGGGGGGGGGGGT",
-        "TGGGTTGGGGTTGGGT",
-        "TGGGGGGPPGGGGGGP",
-        "TGGGFGGPPGGFGGGP",
-        "TGGGGGGGGGGGGGGT",
-        "TGGTTGGGGGGTTGGT",
-        "TGGGGGPPGGGGGGGT",
-        "TGGGGGPPGGGGGGGT",
-        "TTTTTTTTTTTTTTTT",
+        "T".repeat(9) + "P".repeat(6) + "T".repeat(9),
+        "T" + "G".repeat(8) + "P".repeat(6) + "G".repeat(8) + "T",
+        "T" + "G".repeat(2) + "F".repeat(2) + "G".repeat(4) + "P".repeat(6) + "G".repeat(3) + "F" + "G".repeat(4) + "T",
+        "T" + "G".repeat(22) + "T",
+        "T" + "G".repeat(4) + "T".repeat(2) + "G".repeat(8) + "T".repeat(2) + "G".repeat(6) + "T",
+        "T" + "G".repeat(7) + "P".repeat(4) + "G".repeat(11) + "P",
+        "T" + "G".repeat(3) + "F" + "G".repeat(3) + "P".repeat(4) + "G".repeat(3) + "F" + "G".repeat(7) + "P",
+        "T" + "G".repeat(22) + "T",
+        "T" + "G".repeat(3) + "T".repeat(2) + "G".repeat(11) + "T".repeat(2) + "G".repeat(4) + "P",
+        "T" + "G".repeat(8) + "P".repeat(4) + "G".repeat(10) + "T",
+        "T" + "G".repeat(8) + "P".repeat(4) + "G".repeat(10) + "T",
+        "T" + "G".repeat(4) + "F" + "G".repeat(5) + "P".repeat(4) + "G".repeat(5) + "F" + "G".repeat(2) + "T",
+        "T" + "G".repeat(22) + "T",
+        "T" + "G".repeat(2) + "T".repeat(2) + "G".repeat(14) + "T".repeat(2) + "G".repeat(2) + "T",
+        "T" + "G".repeat(22) + "T",
+        "T" + "G".repeat(8) + "P".repeat(4) + "G".repeat(10) + "T",
+        "T" + "G".repeat(8) + "P".repeat(4) + "G".repeat(10) + "T",
+        "T".repeat(24),
       ],
       exits: [
         {
-          xMin: 6,
-          xMax: 9,
+          xMin: 9,
+          xMax: 14,
           y: 0,
           to: "town",
           spawn: { x: 7, y: 10 },
           message: "町に戻った。",
         },
         {
-          x: 15,
+          x: 23,
           yMin: 5,
-          yMax: 6,
+          yMax: 8,
           to: "forest",
-          spawn: { x: 1, y: 6 },
+          spawn: { x: 1, y: 9 },
           message: "森に入った。",
         },
       ],
@@ -345,7 +477,7 @@
           id: "grassland-cache",
           kind: "chest",
           name: "宝箱",
-          x: 13,
+          x: 20,
           y: 6,
           contents: { herb: 2, gold: 12 },
         },
@@ -353,24 +485,24 @@
           id: "grassland-sword",
           kind: "chest",
           name: "宝箱",
-          x: 2,
-          y: 9,
+          x: 3,
+          y: 15,
           contents: { equipment: "copperSword", gold: 8 },
         },
         {
           id: "grassland-warden",
           kind: "boss",
-          name: "草原の番人",
-          x: 12,
-          y: 9,
+          name: "ゴブリン親分",
+          x: 19,
+          y: 12,
           body: "#835b33",
           hair: "#2f2a22",
           enemyId: "grassWarden",
           messages: [
-            "草原の番人「この先は弱き者の通る道ではない。」",
-            "草原の番人「腕を示せ。さもなくばここで引き返せ！」",
+            "ゴブリン親分「交易路は俺たちのものだ。通りたければ荷物を置いていけ！」",
+            "ゴブリン親分「勇者気取りか。ならば力ずくで追い返してやる！」",
           ],
-          victoryMessage: "草原の番人は道を譲った。森への道が少し静かになった。",
+          victoryMessage: "ゴブリンのギャングを追い払った。途絶えていた交易路に少し希望が戻った。",
         },
       ],
     },
@@ -378,34 +510,40 @@
       name: "森",
       encounters: ["leafImp", "forestBat", "wildBoar", "wasp"],
       tiles: [
-        "TTTTTTTTTTTTTTTT",
-        "TAAAAAAPPPAAAAAT",
-        "TAATTTTAPPAADDDT",
-        "TAAAAAAPPAAAATAT",
-        "TAAFTTAAAAFTAAAT",
-        "PAAAAAPPPAAAAAAT",
-        "PAAFTAAPPPAAFTAT",
-        "TAAAAAAPPPAAAAAT",
-        "TATTTAAAPPATTAAT",
-        "TAAAAAAPPPAAAAAT",
-        "TAAAAAAPPAAAAAAT",
-        "TTTTTTTPPPTTTTTT",
+        "T".repeat(24),
+        "T" + "A".repeat(22) + "T",
+        "T" + "A".repeat(6) + "P".repeat(4) + "A".repeat(12) + "T",
+        "T" + "AAA" + "T".repeat(3) + "A".repeat(5) + "D".repeat(3) + "A".repeat(8) + "T",
+        "T" + "A".repeat(22) + "T",
+        "T" + "A".repeat(4) + "T".repeat(2) + "A".repeat(8) + "F" + "A".repeat(7) + "T",
+        "P" + "A".repeat(8) + "P".repeat(4) + "A".repeat(10) + "T",
+        "P" + "A".repeat(3) + "F" + "A".repeat(4) + "P".repeat(4) + "A".repeat(3) + "F" + "A".repeat(6) + "T",
+        "P" + "A".repeat(22) + "T",
+        "P" + "A".repeat(6) + "T".repeat(2) + "A".repeat(6) + "P".repeat(3) + "A".repeat(5) + "T",
+        "T" + "A".repeat(8) + "P".repeat(4) + "A".repeat(10) + "T",
+        "T" + "A".repeat(22) + "T",
+        "T" + "A".repeat(3) + "T".repeat(3) + "A".repeat(12) + "T".repeat(2) + "A".repeat(2) + "T",
+        "T" + "A".repeat(22) + "T",
+        "T" + "A".repeat(8) + "P".repeat(4) + "A".repeat(10) + "T",
+        "T" + "A".repeat(22) + "T",
+        "T" + "A".repeat(8) + "P".repeat(4) + "A".repeat(10) + "T",
+        "T".repeat(24),
       ],
       exits: [
         {
           x: 0,
-          yMin: 5,
-          yMax: 6,
+          yMin: 6,
+          yMax: 9,
           to: "grassland",
-          spawn: { x: 14, y: 6 },
+          spawn: { x: 22, y: 6 },
           message: "草原に戻った。",
         },
         {
           xMin: 12,
           xMax: 14,
-          y: 2,
+          y: 3,
           to: "cave",
-          spawn: { x: 7, y: 10 },
+          spawn: { x: 11, y: 16 },
           message: "洞窟に入った。",
         },
       ],
@@ -414,24 +552,24 @@
           id: "forest-vest",
           kind: "chest",
           name: "宝箱",
-          x: 11,
-          y: 5,
+          x: 18,
+          y: 6,
           contents: { equipment: "rangerVest", herb: 1 },
         },
         {
           id: "forest-ring",
           kind: "chest",
           name: "宝箱",
-          x: 3,
-          y: 10,
+          x: 4,
+          y: 15,
           contents: { equipment: "wisdomRing" },
         },
         {
           id: "forest-warden",
           kind: "boss",
           name: "森の番人",
-          x: 7,
-          y: 8,
+          x: 12,
+          y: 12,
           body: "#3f7e4d",
           hair: "#1f4530",
           enemyId: "forestWarden",
@@ -447,26 +585,32 @@
       name: "洞窟",
       encounters: ["caveBat", "goblin", "stoneSlime", "spirit"],
       tiles: [
-        "RRRRRRRRRRRRRRRR",
-        "RBBBBBBBBBBBBBBR",
-        "RBRRRBBBBRRRBBBR",
-        "RBBBBBBBBBRBBBBR",
-        "RBBRRRBBBBRRBBBR",
-        "RBBBBBBBRBBBBBBR",
-        "RRRBBBRBRBBBRRRR",
-        "RBBBBBBBRBBBBBBR",
-        "RBBBRRRBBBBRRBBR",
-        "RBBBBBBBBBBBBBBR",
-        "RBBBBRRBBBBBBBBR",
-        "RRRRRRRBBRRRRRRR",
+        "R".repeat(24),
+        "R" + "B".repeat(22) + "R",
+        "R" + "B".repeat(3) + "R".repeat(3) + "B".repeat(7) + "R".repeat(3) + "B".repeat(6) + "R",
+        "R" + "B".repeat(22) + "R",
+        "R" + "B".repeat(5) + "R".repeat(3) + "B".repeat(7) + "R".repeat(2) + "B".repeat(5) + "R",
+        "R" + "B".repeat(22) + "R",
+        "R".repeat(3) + "B".repeat(6) + "R" + "B".repeat(6) + "R".repeat(3) + "B".repeat(4) + "R",
+        "R" + "B".repeat(22) + "R",
+        "R" + "B".repeat(4) + "R".repeat(3) + "B".repeat(8) + "R".repeat(2) + "B".repeat(5) + "R",
+        "R" + "B".repeat(22) + "R",
+        "R" + "B".repeat(5) + "R".repeat(2) + "B".repeat(15) + "R",
+        "R" + "B".repeat(22) + "R",
+        "R".repeat(3) + "B".repeat(3) + "R" + "B".repeat(5) + "R" + "B".repeat(4) + "R".repeat(4) + "B".repeat(2) + "R",
+        "R" + "B".repeat(22) + "R",
+        "R" + "B".repeat(4) + "R".repeat(3) + "B".repeat(10) + "R".repeat(2) + "B".repeat(3) + "R",
+        "R" + "B".repeat(22) + "R",
+        "R" + "B".repeat(9) + "P".repeat(4) + "B".repeat(9) + "R",
+        "R".repeat(10) + "P".repeat(4) + "R".repeat(10),
       ],
       exits: [
         {
-          xMin: 7,
-          xMax: 8,
-          y: 11,
+          xMin: 10,
+          xMax: 13,
+          y: 17,
           to: "forest",
-          spawn: { x: 12, y: 3 },
+          spawn: { x: 13, y: 4 },
           message: "森に戻った。",
         },
       ],
@@ -475,15 +619,15 @@
           id: "cave-iron-sword",
           kind: "chest",
           name: "宝箱",
-          x: 13,
-          y: 9,
+          x: 20,
+          y: 10,
           contents: { equipment: "ironSword", gold: 18 },
         },
         {
           id: "cave-armor",
           kind: "chest",
           name: "宝箱",
-          x: 2,
+          x: 3,
           y: 5,
           contents: { equipment: "ironArmor" },
         },
@@ -491,8 +635,8 @@
           id: "cave-warden",
           kind: "boss",
           name: "洞窟の番人",
-          x: 7,
-          y: 5,
+          x: 12,
+          y: 8,
           body: "#6c6875",
           hair: "#2a2d35",
           enemyId: "caveWarden",
@@ -638,7 +782,7 @@
       sprite: "slime",
     },
     grassWarden: {
-      name: "草原の番人",
+      name: "ゴブリン親分",
       maxHp: 70,
       attack: 64,
       defense: 38,
@@ -729,6 +873,9 @@
   let touchMovePointerId = null;
   let touchMoveDirection = null;
   let battleCommandView = "root";
+  let activeMobileMenuTab = "status";
+  let activeItemCategory = "equipment";
+  let selectedInventoryItem = null;
 
   function createInitialState() {
     return {
@@ -766,6 +913,7 @@
         inventory: {
           herb: 1,
           equipment: {},
+          keyItems: {},
         },
       },
       npcTalkIndex: {},
@@ -785,15 +933,28 @@
     return MAPS[state.mapId];
   }
 
+  function mapWidth(mapId = state.mapId) {
+    return MAPS[mapId].tiles[0].length;
+  }
+
+  function mapHeight(mapId = state.mapId) {
+    return MAPS[mapId].tiles.length;
+  }
+
   function validateMaps() {
     Object.entries(MAPS).forEach(([mapId, map]) => {
-      if (map.tiles.length !== MAP_ROWS) {
-        throw new Error(`${mapId} must have ${MAP_ROWS} rows.`);
+      if (map.tiles.length < VIEW_ROWS) {
+        throw new Error(`${mapId} must have at least ${VIEW_ROWS} rows.`);
+      }
+
+      const width = map.tiles[0]?.length || 0;
+      if (width < VIEW_COLS) {
+        throw new Error(`${mapId} must have at least ${VIEW_COLS} columns.`);
       }
 
       map.tiles.forEach((row, index) => {
-        if (row.length !== MAP_COLS) {
-          throw new Error(`${mapId} row ${index} must have ${MAP_COLS} columns.`);
+        if (row.length !== width) {
+          throw new Error(`${mapId} row ${index} must have ${width} columns.`);
         }
 
         [...row].forEach((tile) => {
@@ -806,7 +967,7 @@
   }
 
   function getTile(mapId, x, y) {
-    if (x < 0 || x >= MAP_COLS || y < 0 || y >= MAP_ROWS) {
+    if (x < 0 || x >= mapWidth(mapId) || y < 0 || y >= mapHeight(mapId)) {
       return "T";
     }
 
@@ -928,6 +1089,7 @@
     ui.mobileMenuPanel.hidden = false;
     ui.menuButton?.setAttribute("aria-expanded", "true");
     document.body.classList.add("menu-open");
+    renderMobileMenu();
   }
 
   function closeMobileMenu() {
@@ -943,6 +1105,218 @@
   function runMobileMenuAction(action) {
     closeMobileMenu();
     action();
+  }
+
+  function setMobileMenuTab(tab) {
+    activeMobileMenuTab = tab;
+    selectedInventoryItem = null;
+    renderMobileMenu();
+  }
+
+  function setItemCategory(category) {
+    activeItemCategory = category;
+    selectedInventoryItem = null;
+    renderMobileMenu();
+  }
+
+  function selectedInventoryEntry() {
+    if (!selectedInventoryItem) {
+      return null;
+    }
+
+    return getInventoryEntries(selectedInventoryItem.category)
+      .find((entry) => entry.id === selectedInventoryItem.id) || null;
+  }
+
+  function selectInventoryItem(category, id) {
+    selectedInventoryItem = { category, id };
+    renderMobileMenu();
+  }
+
+  function clearInventorySelection() {
+    selectedInventoryItem = null;
+    renderMobileMenu();
+  }
+
+  function renderMobileMenu() {
+    if (!ui.mobileMenuPanel) {
+      return;
+    }
+
+    const showingStatus = activeMobileMenuTab === "status";
+    ui.mobileStatusTab?.setAttribute("aria-selected", String(showingStatus));
+    ui.mobileItemsTab?.setAttribute("aria-selected", String(!showingStatus));
+    if (ui.mobileStatusPanel) {
+      ui.mobileStatusPanel.hidden = !showingStatus;
+    }
+    if (ui.mobileItemsPanel) {
+      ui.mobileItemsPanel.hidden = showingStatus;
+    }
+
+    renderAbilityDetails();
+    renderInventoryMenu();
+  }
+
+  function renderAbilityDetails() {
+    if (!ui.mobileAbilityDetails) {
+      return;
+    }
+
+    const player = state.player;
+    const rows = [
+      ["HP", `体力。0になると町へ戻る。現在 ${player.hp} / ${player.maxHp}`],
+      ["MP", `魔法や特技で消費する力。現在 ${player.mp} / ${player.maxMp}`],
+      ["攻撃力", `通常攻撃と斬撃系特技に影響。基礎${player.attack} + 装備${player.equipment.attack || 0}`],
+      ["防御力", `受ける物理ダメージを軽減。基礎${player.defense} + 装備${player.equipment.defense || 0}`],
+      ["賢さ", `回復魔法と攻撃魔法の効果に影響。基礎${player.wisdom} + 装備${player.equipment.wisdom || 0}`],
+      ["素早さ", `ターンの先攻判定に影響。基礎${player.agility} + 装備${player.equipment.agility || 0}`],
+      ["器用さ", `会心率、命中の揺れ、行動順補正に影響。基礎${player.dexterity} + 装備${player.equipment.dexterity || 0}`],
+    ];
+
+    ui.mobileAbilityDetails.innerHTML = "";
+    rows.forEach(([label, description]) => {
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      const detail = document.createElement("dd");
+      term.textContent = label;
+      detail.textContent = description;
+      row.append(term, detail);
+      ui.mobileAbilityDetails.append(row);
+    });
+  }
+
+  function renderInventoryMenu() {
+    if (!ui.itemList || !ui.itemDetail) {
+      return;
+    }
+
+    const categoryMap = {
+      equipment: ui.itemEquipmentTab,
+      tools: ui.itemToolsTab,
+      key: ui.itemKeyTab,
+    };
+    Object.entries(categoryMap).forEach(([category, button]) => {
+      button?.setAttribute("aria-selected", String(activeItemCategory === category));
+    });
+
+    const entries = getInventoryEntries(activeItemCategory);
+    const selectedEntry = selectedInventoryEntry();
+    ui.itemList.innerHTML = "";
+
+    if (entries.length === 0) {
+      const note = document.createElement("p");
+      note.className = "empty-item-note";
+      note.textContent = "この分類のアイテムはまだ持っていない。";
+      ui.itemList.append(note);
+    } else {
+      entries.forEach((entry) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = selectedEntry?.id === entry.id && selectedEntry.category === entry.category
+          ? "is-selected"
+          : "";
+        button.addEventListener("click", () => selectInventoryItem(entry.category, entry.id));
+
+        const name = document.createElement("span");
+        const count = document.createElement("span");
+        name.textContent = entry.name;
+        count.className = "item-count";
+        count.textContent = entry.countLabel;
+        button.append(name, count);
+        ui.itemList.append(button);
+      });
+    }
+
+    renderItemDetail(selectedEntry);
+  }
+
+  function renderItemDetail(entry) {
+    if (!ui.itemDetail) {
+      return;
+    }
+
+    ui.itemDetail.hidden = !entry;
+    if (!entry) {
+      return;
+    }
+
+    ui.itemIcon.className = `item-icon ${entry.category === "tools" ? "tool" : entry.category}`;
+    ui.itemIcon.textContent = entry.icon || "品";
+    ui.itemName.textContent = entry.name;
+    ui.itemDescription.textContent = entry.description;
+
+    if (entry.category === "equipment") {
+      ui.itemUseButton.hidden = false;
+      ui.itemUseButton.disabled = entry.equipped;
+      ui.itemUseButton.textContent = entry.equipped ? "装備中" : "装備する";
+      ui.itemDropButton.hidden = false;
+      ui.itemDropButton.disabled = false;
+      ui.itemDropButton.textContent = "捨てる";
+    } else if (entry.category === "tools") {
+      ui.itemUseButton.hidden = false;
+      ui.itemUseButton.disabled = entry.id === "herb" && state.player.hp >= state.player.maxHp;
+      ui.itemUseButton.textContent = "使う";
+      ui.itemDropButton.hidden = false;
+      ui.itemDropButton.disabled = false;
+      ui.itemDropButton.textContent = "捨てる";
+    } else {
+      ui.itemUseButton.hidden = false;
+      ui.itemUseButton.disabled = true;
+      ui.itemUseButton.textContent = "使えない";
+      ui.itemDropButton.hidden = false;
+      ui.itemDropButton.disabled = true;
+      ui.itemDropButton.textContent = "捨てられない";
+    }
+  }
+
+  function useSelectedInventoryItem() {
+    const entry = selectedInventoryEntry();
+    if (!entry) {
+      return;
+    }
+
+    const inventory = ensureInventory();
+    if (entry.category === "equipment") {
+      equipItem(entry.id);
+      setBattleMessage(`${entry.name}を装備した。`);
+      playItemSound();
+    } else if (entry.category === "tools" && entry.id === "herb" && inventory.herb > 0) {
+      if (state.player.hp >= state.player.maxHp) {
+        setBattleMessage("HPは満タンだ。");
+      } else {
+        inventory.herb -= 1;
+        const healed = Math.min(state.player.maxHp - state.player.hp, HERB_HEAL);
+        state.player.hp += healed;
+        setBattleMessage(`薬草を使った。HPが${healed}回復した。`);
+        playHealSound();
+      }
+    }
+
+    render();
+  }
+
+  function dropSelectedInventoryItem() {
+    const entry = selectedInventoryEntry();
+    if (!entry || entry.category === "key") {
+      return;
+    }
+
+    const confirmed = window.confirm(`${entry.name}を捨てますか？`);
+    if (!confirmed) {
+      return;
+    }
+
+    const inventory = ensureInventory();
+    if (entry.category === "equipment") {
+      unequipItem(entry.id);
+      delete inventory.equipment[entry.id];
+    } else if (entry.category === "tools" && entry.id === "herb") {
+      inventory.herb = Math.max(0, inventory.herb - 1);
+    }
+
+    selectedInventoryItem = null;
+    setBattleMessage(`${entry.name}を捨てた。`);
+    render();
   }
 
   function clamp(value, min, max) {
@@ -1115,6 +1489,9 @@
     if (!player.inventory.equipment) {
       player.inventory.equipment = {};
     }
+    if (!player.inventory.keyItems) {
+      player.inventory.keyItems = {};
+    }
     return player.inventory;
   }
 
@@ -1150,6 +1527,77 @@
     gear[item.slot] = itemId;
     syncEquipmentStats();
     return { item, previousItem };
+  }
+
+  function hasKeyItem(itemId) {
+    return Boolean(ensureInventory().keyItems[itemId]);
+  }
+
+  function giveKeyItem(itemId) {
+    if (!KEY_ITEMS[itemId]) {
+      return false;
+    }
+
+    ensureInventory().keyItems[itemId] = true;
+    playItemSound();
+    return true;
+  }
+
+  function unequipItem(itemId) {
+    const gear = ensureGear();
+    Object.keys(gear).forEach((slot) => {
+      if (gear[slot] === itemId) {
+        gear[slot] = null;
+      }
+    });
+    syncEquipmentStats();
+  }
+
+  function getInventoryEntries(category = activeItemCategory) {
+    const inventory = ensureInventory();
+
+    if (category === "equipment") {
+      return Object.keys(inventory.equipment)
+        .filter((itemId) => inventory.equipment[itemId] && EQUIPMENT_ITEMS[itemId])
+        .map((itemId) => {
+          const item = EQUIPMENT_ITEMS[itemId];
+          const equipped = Object.values(ensureGear()).includes(itemId);
+          return {
+            category: "equipment",
+            id: itemId,
+            name: item.name,
+            description: item.description,
+            icon: item.slot === "weapon" ? "剣" : item.slot === "armor" ? "鎧" : "輪",
+            countLabel: equipped ? "装備中" : equipmentSlotLabel(item.slot),
+            equipped,
+          };
+        });
+    }
+
+    if (category === "tools") {
+      return Object.keys(TOOL_ITEMS)
+        .filter((itemId) => (Number(inventory[itemId]) || 0) > 0)
+        .map((itemId) => ({
+          category: "tools",
+          id: itemId,
+          name: TOOL_ITEMS[itemId].name,
+          description: TOOL_ITEMS[itemId].description,
+          icon: TOOL_ITEMS[itemId].icon,
+          countLabel: `${inventory[itemId]}個`,
+          count: inventory[itemId],
+        }));
+    }
+
+    return Object.keys(inventory.keyItems)
+      .filter((itemId) => inventory.keyItems[itemId] && KEY_ITEMS[itemId])
+      .map((itemId) => ({
+        category: "key",
+        id: itemId,
+        name: KEY_ITEMS[itemId].name,
+        description: KEY_ITEMS[itemId].description,
+        icon: KEY_ITEMS[itemId].icon,
+        countLabel: "大切",
+      }));
   }
 
   function isChestOpen(chest) {
@@ -1249,6 +1697,21 @@
       return;
     }
 
+    if (entity.kind === "mapGiver") {
+      await talkToMapGiver();
+      return;
+    }
+
+    if (entity.kind === "shop") {
+      await openShop(entity);
+      return;
+    }
+
+    if (entity.kind === "door") {
+      enterDoor(entity);
+      return;
+    }
+
     if (entity.kind === "inn") {
       await stayAtInn();
       return;
@@ -1262,6 +1725,94 @@
     if (entity.kind === "boss") {
       await challengeBoss(entity);
     }
+  }
+
+  async function talkToMapGiver() {
+    if (!state.tutorial?.done) {
+      await say("地図好きの村人", "旅立ちの準備が終わったら、また声をかけてくれ。役に立つものを渡すよ。");
+      return;
+    }
+
+    if (hasKeyItem("worldMap")) {
+      await say("地図好きの村人", "地図はメニューのアイテム、大切なものから見られるよ。道に迷ったら思い出してくれ。");
+      return;
+    }
+
+    await say("地図好きの村人", "魔王討伐に向かうなら、道を知っておくのが一番だ。");
+    await say("地図好きの村人", "町の南は草原、東の奥に森、森の奥には洞窟がある。これを持っていきな。");
+    giveKeyItem("worldMap");
+    render();
+    await say("地図好きの村人", "旅の地図を手に入れた。メニューの大切なものに入れておいたよ。");
+  }
+
+  function enterDoor(entity) {
+    state.mapId = entity.to;
+    state.player.x = entity.spawn.x;
+    state.player.y = entity.spawn.y;
+    setBattleMessage(entity.message || "中に入った。");
+    showFieldMessage(entity.name, entity.message || "中に入った。");
+    render();
+  }
+
+  async function openShop(entity) {
+    if (entity.shopType === "item") {
+      await openItemShop();
+    } else {
+      await openEquipmentShop();
+    }
+  }
+
+  async function openItemShop() {
+    const price = 8;
+    const willBuy = await ask("道具屋", `薬草なら${price}Gだよ。買っていくかい？`);
+    if (!willBuy) {
+      await say("道具屋", "また必要になったら寄っておくれ。");
+      return;
+    }
+
+    if (state.player.gold < price) {
+      await say("道具屋", "お金が足りないみたいだね。");
+      return;
+    }
+
+    state.player.gold -= price;
+    ensureInventory().herb += 1;
+    playItemSound();
+    render();
+    await say("道具屋", "薬草をひとつ渡したよ。無理は禁物だ。");
+  }
+
+  async function openEquipmentShop() {
+    const offers = [
+      { id: "copperSword", price: 30 },
+      { id: "rangerVest", price: 32 },
+      { id: "wisdomRing", price: 45 },
+    ];
+    const inventory = ensureInventory();
+    const offer = offers.find((candidate) => !inventory.equipment[candidate.id]);
+    if (!offer) {
+      await say("装備屋", "今の品はもう全部持っているようだ。新しい仕入れを待ってくれ。");
+      return;
+    }
+
+    const item = EQUIPMENT_ITEMS[offer.id];
+    const willBuy = await ask("装備屋", `${item.name}は${offer.price}Gだ。買って装備していくか？`);
+
+    if (!willBuy) {
+      await say("装備屋", "装備は命を守る。必要になったらまた来てくれ。");
+      return;
+    }
+
+    if (state.player.gold < offer.price) {
+      await say("装備屋", "その装備には少しお金が足りないようだ。");
+      return;
+    }
+
+    state.player.gold -= offer.price;
+    const result = equipItem(offer.id);
+    playItemSound();
+    render();
+    await say("装備屋", `${result.item.name}を装備した。これで少し旅が楽になるはずだ。`);
   }
 
   async function challengeBoss(entity) {
@@ -2340,6 +2891,7 @@
     const loadedInventory = {
       herb: Number.isFinite(savedHerb) ? Math.max(0, savedHerb) : 1,
       equipment: payload.player.inventory?.equipment || {},
+      keyItems: payload.player.inventory?.keyItems || {},
     };
     const loadedGear = {
       weapon: EQUIPMENT_ITEMS[payload.player.gear?.weapon] ? payload.player.gear.weapon : null,
@@ -2404,7 +2956,7 @@
   }
 
   function isValidSave(payload) {
-    if (!payload || ![1, 2, 3, 4, 5].includes(payload.version)) {
+    if (!payload || ![1, 2, 3, 4, 5, 6].includes(payload.version)) {
       return false;
     }
 
@@ -2450,16 +3002,19 @@
 
   function draw() {
     const map = currentMap();
+    const camera = getCamera();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let y = 0; y < MAP_ROWS; y += 1) {
-      for (let x = 0; x < MAP_COLS; x += 1) {
-        drawTile(map.tiles[y][x], x, y);
+    for (let y = 0; y < VIEW_ROWS; y += 1) {
+      for (let x = 0; x < VIEW_COLS; x += 1) {
+        const worldX = camera.x + x;
+        const worldY = camera.y + y;
+        drawTile(getTile(state.mapId, worldX, worldY), x, y);
       }
     }
 
-    map.entities.forEach(drawEntity);
-    drawPlayer(state.player.x, state.player.y);
+    map.entities.forEach((entity) => drawEntity(entity, camera));
+    drawPlayer(state.player.x - camera.x, state.player.y - camera.y);
 
     if (state.mode === "battle") {
       drawBattleOverlay(state.battle.enemy);
@@ -2573,26 +3128,37 @@
     ctx.fillRect(px + 3, py + 13, 26, 9);
   }
 
-  function drawEntity(entity) {
+  function drawEntity(entity, camera) {
     if (isEntityGone(entity)) {
       return;
     }
 
+    const screenX = entity.x - camera.x;
+    const screenY = entity.y - camera.y;
+    if (screenX < 0 || screenX >= VIEW_COLS || screenY < 0 || screenY >= VIEW_ROWS) {
+      return;
+    }
+
     if (entity.kind === "chest") {
-      drawChest(entity);
-      drawNameplate(isChestOpen(entity) ? "空" : entity.name, entity.x, entity.y);
+      drawChest(entity, screenX, screenY);
+      drawNameplate(isChestOpen(entity) ? "空" : entity.name, screenX, screenY);
+      return;
+    }
+
+    if (entity.kind === "door") {
+      drawNameplate(entity.name, screenX, screenY);
       return;
     }
 
     if (entity.kind === "boss") {
-      drawCharacter(entity.x, entity.y, entity.body || "#835b33", entity.hair || "#2f2a22");
-      drawBossMark(entity.x, entity.y);
-      drawNameplate(entity.name, entity.x, entity.y);
+      drawCharacter(screenX, screenY, entity.body || "#835b33", entity.hair || "#2f2a22");
+      drawBossMark(screenX, screenY);
+      drawNameplate(entity.name, screenX, screenY);
       return;
     }
 
-    drawCharacter(entity.x, entity.y, entity.body, entity.hair);
-    drawNameplate(entity.name, entity.x, entity.y);
+    drawCharacter(screenX, screenY, entity.body, entity.hair);
+    drawNameplate(entity.name, screenX, screenY);
   }
 
   function drawBossMark(x, y) {
@@ -2603,9 +3169,9 @@
     ctx.fillRect(px + 19, py + 3, 5, 5);
   }
 
-  function drawChest(chest) {
-    const px = chest.x * TILE_SIZE;
-    const py = chest.y * TILE_SIZE;
+  function drawChest(chest, x, y) {
+    const px = x * TILE_SIZE;
+    const py = y * TILE_SIZE;
     const opened = isChestOpen(chest);
 
     ctx.fillStyle = "rgba(35, 45, 38, 0.22)";
@@ -3275,11 +3841,24 @@
     if (ui.logList) {
       ui.logList.replaceChildren();
     }
+
+    if (ui.mobileMenuPanel && !ui.mobileMenuPanel.hidden) {
+      renderMobileMenu();
+    }
   }
 
   function render() {
     draw();
     renderHud();
+  }
+
+  function getCamera() {
+    const maxX = Math.max(0, mapWidth() - VIEW_COLS);
+    const maxY = Math.max(0, mapHeight() - VIEW_ROWS);
+    return {
+      x: clamp(state.player.x - Math.floor(VIEW_COLS / 2), 0, maxX),
+      y: clamp(state.player.y - Math.floor(VIEW_ROWS / 2), 0, maxY),
+    };
   }
 
   function handleKeyDown(event) {
@@ -3442,6 +4021,14 @@
     ui.menuSaveButton.addEventListener("click", () => runMobileMenuAction(saveGame));
     ui.menuLoadButton.addEventListener("click", () => runMobileMenuAction(loadGame));
     ui.menuResetButton.addEventListener("click", () => runMobileMenuAction(resetGame));
+    ui.mobileStatusTab.addEventListener("click", () => setMobileMenuTab("status"));
+    ui.mobileItemsTab.addEventListener("click", () => setMobileMenuTab("items"));
+    ui.itemEquipmentTab.addEventListener("click", () => setItemCategory("equipment"));
+    ui.itemToolsTab.addEventListener("click", () => setItemCategory("tools"));
+    ui.itemKeyTab.addEventListener("click", () => setItemCategory("key"));
+    ui.itemUseButton.addEventListener("click", useSelectedInventoryItem);
+    ui.itemDropButton.addEventListener("click", dropSelectedInventoryItem);
+    ui.itemBackButton.addEventListener("click", clearInventorySelection);
     ui.touchInteractButton.addEventListener("click", handleTouchAction);
     ui.touchFightButton.addEventListener("click", openBattleActionMenu);
     ui.touchAttackButton.addEventListener("click", handleBattlePrimaryButton);
