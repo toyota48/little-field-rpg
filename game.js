@@ -25,15 +25,27 @@
       name: "旅の地図",
       description: "村人から受け取った地図。町、草原、森、洞窟への道が描かれている。",
       icon: "地",
+      mapText: [
+        "      [町]",
+        "       |",
+        "     [草原] ---- [森] ---- [洞窟]",
+        "",
+        "町: 宿屋、道具屋、武器屋、民家",
+        "草原: ゴブリン親分の交易路",
+        "森: 奥に洞窟への入口",
+        "洞窟: 強い魔物が潜む場所",
+      ].join("\n"),
     },
   };
   const EFFECT_DURATIONS = {
-    slash: 360,
-    enemyAttack: 420,
-    heal: 520,
-    run: 320,
-    defeat: 420,
+    slash: 720,
+    enemyAttack: 780,
+    heal: 900,
+    magicAttack: 860,
+    run: 520,
+    defeat: 760,
   };
+  const BATTLE_TURN_PAUSE = 520;
   const BATTLE_ACTION_DETAILS = {
     fullSlash: {
       category: "skill",
@@ -148,6 +160,12 @@
   let pendingBattleAction = null;
 
   const ui = {
+    titleScreen: document.getElementById("titleScreen"),
+    titleNewGameButton: document.getElementById("titleNewGameButton"),
+    titleContinueButton: document.getElementById("titleContinueButton"),
+    titleHowToButton: document.getElementById("titleHowToButton"),
+    titleHowToPanel: document.getElementById("titleHowToPanel"),
+    titleNotice: document.getElementById("titleNotice"),
     mapValue: document.getElementById("mapValue"),
     fieldMapBadge: document.getElementById("fieldMapBadge"),
     modeValue: document.getElementById("modeValue"),
@@ -301,6 +319,7 @@
           id: "village-house-door",
           kind: "door",
           name: "民家",
+          buildingLabel: "民家",
           x: 12,
           y: 5,
           to: "villageHouse",
@@ -308,24 +327,22 @@
           message: "民家に入った。",
         },
         {
-          id: "item-shopkeeper",
+          id: "item-shop",
           kind: "shop",
           shopType: "item",
           name: "道具屋",
+          buildingLabel: "道具",
           x: 10,
           y: 5,
-          body: "#3f7e4d",
-          hair: "#273142",
         },
         {
-          id: "equipment-shopkeeper",
+          id: "weapon-shop",
           kind: "shop",
           shopType: "equipment",
-          name: "装備屋",
+          name: "武器屋",
+          buildingLabel: "武器",
           x: 13,
           y: 5,
-          body: "#6c6875",
-          hair: "#2e2a23",
         },
         {
           id: "cartographer",
@@ -381,10 +398,9 @@
           id: "innkeeper",
           kind: "inn",
           name: "宿屋",
+          buildingLabel: "宿",
           x: 5,
           y: 4,
-          body: "#b87333",
-          hair: "#2e2a23",
         },
       ],
     },
@@ -876,6 +892,8 @@
   let activeMobileMenuTab = "status";
   let activeItemCategory = "equipment";
   let selectedInventoryItem = null;
+  let viewedKeyItemId = null;
+  let titleScreenVisible = true;
 
   function createInitialState() {
     return {
@@ -1081,6 +1099,49 @@
     });
   }
 
+  function hideTitleScreen() {
+    titleScreenVisible = false;
+    if (ui.titleScreen) {
+      ui.titleScreen.hidden = true;
+    }
+  }
+
+  function showTitleNotice(message) {
+    if (ui.titleNotice) {
+      ui.titleNotice.textContent = message;
+    }
+  }
+
+  function toggleHowTo() {
+    if (!ui.titleHowToPanel) {
+      return;
+    }
+
+    ui.titleHowToPanel.hidden = !ui.titleHowToPanel.hidden;
+    showTitleNotice("");
+  }
+
+  function startNewGame(options = {}) {
+    const shouldConfirm = options.confirm !== false;
+    if (shouldConfirm && !window.confirm("最初から始めますか？")) {
+      return false;
+    }
+
+    hideTitleScreen();
+    state = createInitialState();
+    battleCommandView = "root";
+    pendingBattleAction = null;
+    controlsLocked = false;
+    activeMessage = null;
+    ui.fieldMessage.hidden = true;
+    ui.messageChoices.hidden = true;
+    ui.screenFrame.classList.remove("has-message");
+    setBattleMessage("新しく冒険を始めた。");
+    render();
+    maybeStartTutorial();
+    return true;
+  }
+
   function openMobileMenu() {
     if (!ui.mobileMenuPanel || state.mode === "battle") {
       return;
@@ -1116,6 +1177,7 @@
   function setItemCategory(category) {
     activeItemCategory = category;
     selectedInventoryItem = null;
+    viewedKeyItemId = null;
     renderMobileMenu();
   }
 
@@ -1130,6 +1192,7 @@
 
   function selectInventoryItem(category, id) {
     selectedInventoryItem = { category, id };
+    viewedKeyItemId = null;
     renderMobileMenu();
   }
 
@@ -1164,22 +1227,20 @@
 
     const player = state.player;
     const rows = [
-      ["HP", `体力。0になると町へ戻る。現在 ${player.hp} / ${player.maxHp}`],
-      ["MP", `魔法や特技で消費する力。現在 ${player.mp} / ${player.maxMp}`],
-      ["攻撃力", `通常攻撃と斬撃系特技に影響。基礎${player.attack} + 装備${player.equipment.attack || 0}`],
-      ["防御力", `受ける物理ダメージを軽減。基礎${player.defense} + 装備${player.equipment.defense || 0}`],
-      ["賢さ", `回復魔法と攻撃魔法の効果に影響。基礎${player.wisdom} + 装備${player.equipment.wisdom || 0}`],
-      ["素早さ", `ターンの先攻判定に影響。基礎${player.agility} + 装備${player.equipment.agility || 0}`],
-      ["器用さ", `会心率、命中の揺れ、行動順補正に影響。基礎${player.dexterity} + 装備${player.equipment.dexterity || 0}`],
+      ["攻撃力", effectiveStat(player, "attack")],
+      ["防御力", effectiveStat(player, "defense")],
+      ["賢さ", effectiveStat(player, "wisdom")],
+      ["素早さ", effectiveStat(player, "agility")],
+      ["器用さ", effectiveStat(player, "dexterity")],
     ];
 
     ui.mobileAbilityDetails.innerHTML = "";
-    rows.forEach(([label, description]) => {
+    rows.forEach(([label, value]) => {
       const row = document.createElement("div");
       const term = document.createElement("dt");
       const detail = document.createElement("dd");
       term.textContent = label;
-      detail.textContent = description;
+      detail.textContent = value;
       row.append(term, detail);
       ui.mobileAbilityDetails.append(row);
     });
@@ -1230,6 +1291,78 @@
     renderItemDetail(selectedEntry);
   }
 
+  function statsWithItemEquipped(itemId) {
+    const item = EQUIPMENT_ITEMS[itemId];
+    if (!item) {
+      return null;
+    }
+
+    const currentGear = ensureGear();
+    const previewGear = { ...currentGear, [item.slot]: itemId };
+    const previewEquipment = equipmentStatsFromGear(previewGear);
+    return ["attack", "defense", "wisdom", "agility", "dexterity"].map((stat) => ({
+      stat,
+      label: statLabel(stat),
+      before: effectiveStat(state.player, stat),
+      after: Math.max(0, (Number(state.player[stat]) || 0) + (Number(previewEquipment[stat]) || 0)),
+    }));
+  }
+
+  function statLabel(stat) {
+    return {
+      attack: "攻撃力",
+      defense: "防御力",
+      wisdom: "賢さ",
+      agility: "素早さ",
+      dexterity: "器用さ",
+    }[stat] || stat;
+  }
+
+  function renderEquipmentPreview(itemId) {
+    const rows = statsWithItemEquipped(itemId);
+    if (!rows) {
+      return null;
+    }
+
+    const preview = document.createElement("div");
+    preview.className = "equipment-preview";
+    rows
+      .filter((row) => row.before !== row.after)
+      .forEach((row) => {
+        const line = document.createElement("div");
+        const label = document.createElement("span");
+        const value = document.createElement("span");
+        line.className = "equipment-preview-row";
+        label.textContent = row.label;
+        value.innerHTML = `${row.before} → <span class="${row.after > row.before ? "stat-up" : "stat-down"}">${row.after}</span>`;
+        line.append(label, value);
+        preview.append(line);
+      });
+
+    if (!preview.children.length) {
+      const line = document.createElement("div");
+      line.className = "equipment-preview-row";
+      line.textContent = "能力値に変化はない。";
+      preview.append(line);
+    }
+
+    return preview;
+  }
+
+  function renderWorldMapView(itemId) {
+    const keyItem = KEY_ITEMS[itemId];
+    if (!keyItem?.mapText) {
+      return null;
+    }
+
+    const wrapper = document.createElement("div");
+    const map = document.createElement("pre");
+    wrapper.className = "world-map-view";
+    map.textContent = keyItem.mapText;
+    wrapper.append(map);
+    return wrapper;
+  }
+
   function renderItemDetail(entry) {
     if (!ui.itemDetail) {
       return;
@@ -1244,8 +1377,13 @@
     ui.itemIcon.textContent = entry.icon || "品";
     ui.itemName.textContent = entry.name;
     ui.itemDescription.textContent = entry.description;
+    ui.itemDetail.querySelectorAll(".equipment-preview, .world-map-view").forEach((element) => element.remove());
 
     if (entry.category === "equipment") {
+      const preview = renderEquipmentPreview(entry.id);
+      if (preview) {
+        ui.itemDescription.after(preview);
+      }
       ui.itemUseButton.hidden = false;
       ui.itemUseButton.disabled = entry.equipped;
       ui.itemUseButton.textContent = entry.equipped ? "装備中" : "装備する";
@@ -1260,9 +1398,15 @@
       ui.itemDropButton.disabled = false;
       ui.itemDropButton.textContent = "捨てる";
     } else {
+      if (entry.id === "worldMap" && viewedKeyItemId === entry.id) {
+        const mapView = renderWorldMapView(entry.id);
+        if (mapView) {
+          ui.itemDescription.after(mapView);
+        }
+      }
       ui.itemUseButton.hidden = false;
-      ui.itemUseButton.disabled = true;
-      ui.itemUseButton.textContent = "使えない";
+      ui.itemUseButton.disabled = entry.id !== "worldMap";
+      ui.itemUseButton.textContent = entry.id === "worldMap" ? "見る" : "使えない";
       ui.itemDropButton.hidden = false;
       ui.itemDropButton.disabled = true;
       ui.itemDropButton.textContent = "捨てられない";
@@ -1290,6 +1434,9 @@
         setBattleMessage(`薬草を使った。HPが${healed}回復した。`);
         playHealSound();
       }
+    } else if (entry.category === "key" && entry.id === "worldMap") {
+      viewedKeyItemId = entry.id;
+      playItemSound();
     }
 
     render();
@@ -1791,20 +1938,20 @@
     const inventory = ensureInventory();
     const offer = offers.find((candidate) => !inventory.equipment[candidate.id]);
     if (!offer) {
-      await say("装備屋", "今の品はもう全部持っているようだ。新しい仕入れを待ってくれ。");
+      await say("武器屋", "今の品はもう全部持っているようだ。新しい仕入れを待ってくれ。");
       return;
     }
 
     const item = EQUIPMENT_ITEMS[offer.id];
-    const willBuy = await ask("装備屋", `${item.name}は${offer.price}Gだ。買って装備していくか？`);
+    const willBuy = await ask("武器屋", `${item.name}は${offer.price}Gだ。買って装備していくか？`);
 
     if (!willBuy) {
-      await say("装備屋", "装備は命を守る。必要になったらまた来てくれ。");
+      await say("武器屋", "装備は命を守る。必要になったらまた来てくれ。");
       return;
     }
 
     if (state.player.gold < offer.price) {
-      await say("装備屋", "その装備には少しお金が足りないようだ。");
+      await say("武器屋", "その装備には少しお金が足りないようだ。");
       return;
     }
 
@@ -1812,7 +1959,7 @@
     const result = equipItem(offer.id);
     playItemSound();
     render();
-    await say("装備屋", `${result.item.name}を装備した。これで少し旅が楽になるはずだ。`);
+    await say("武器屋", `${result.item.name}を装備した。これで少し旅が楽になるはずだ。`);
   }
 
   async function challengeBoss(entity) {
@@ -2248,7 +2395,7 @@
       if (!playerFirst) {
         addLog(`${enemy.name}が先に動いた。`);
         render();
-        await wait(180);
+        await wait(BATTLE_TURN_PAUSE);
         await enemyTurn();
 
         if (state.mode !== "battle" || !state.battle) {
@@ -2263,7 +2410,7 @@
       }
 
       if (playerFirst && (!isTutorialBattle() || actionType === "attack")) {
-        await wait(220);
+        await wait(BATTLE_TURN_PAUSE);
         await enemyTurn();
       }
     } finally {
@@ -2411,7 +2558,7 @@
       state.player.mp = clamp(state.player.mp - action.mpCost, 0, state.player.maxMp);
       const result = calculateMagicDamage(state.player, enemy, action);
       playMagicSound();
-      await playEffect({ type: "magicAttack", damage: result.damage }, EFFECT_DURATIONS.heal);
+      await playEffect({ type: "magicAttack", damage: result.damage }, EFFECT_DURATIONS.magicAttack);
 
       enemy.hp = clamp(enemy.hp - result.damage, 0, enemy.maxHp);
       addLog(`${action.name}を唱えた。${enemy.name}に${result.damage}ダメージ。`);
@@ -2486,7 +2633,7 @@
       }
 
       addLog("逃げられなかった。");
-      await wait(180);
+      await wait(BATTLE_TURN_PAUSE);
       await enemyTurn();
     } finally {
       if (state.mode === "battle" && state.battle) {
@@ -2514,7 +2661,7 @@
     addLog(`${enemy.name}の攻撃。${criticalText}${result.damage}ダメージ。`);
 
     if (state.player.hp <= 0) {
-      await wait(260);
+      await wait(BATTLE_TURN_PAUSE);
       handlePlayerDefeat();
       return;
     }
@@ -2615,8 +2762,8 @@
       state.player.agility += 3;
       state.player.dexterity += 3;
       state.player.nextExp = Math.floor(state.player.nextExp * 1.45 + 6);
-      state.player.hp = state.player.maxHp;
-      state.player.mp = state.player.maxMp;
+      state.player.hp = clamp(state.player.hp + (state.player.maxHp - before.maxHp), 0, state.player.maxHp);
+      state.player.mp = clamp(state.player.mp + (state.player.maxMp - before.maxMp), 0, state.player.maxMp);
       results.push({
         before,
         after: {
@@ -2738,10 +2885,17 @@
     }
 
     if (audioContext.state === "suspended") {
-      audioContext.resume();
+      audioContext.resume().catch(() => {});
     }
 
     return audioContext;
+  }
+
+  function unlockAudio() {
+    const audio = getAudioContext();
+    if (audio?.state === "suspended") {
+      audio.resume().catch(() => {});
+    }
   }
 
   function playTone(frequency, startOffset, duration, type, volume) {
@@ -2777,45 +2931,45 @@
   }
 
   function playHealSound() {
-    playTone(420, 0, 0.12, "sine", 0.05);
-    playTone(640, 0.09, 0.16, "sine", 0.06);
-    playTone(860, 0.19, 0.18, "sine", 0.05);
+    playTone(420, 0, 0.16, "sine", 0.075);
+    playTone(640, 0.11, 0.2, "sine", 0.085);
+    playTone(860, 0.24, 0.22, "sine", 0.07);
   }
 
   function playMagicSound() {
-    playTone(330, 0, 0.09, "triangle", 0.05);
-    playTone(740, 0.07, 0.11, "square", 0.055);
-    playTone(990, 0.17, 0.1, "sawtooth", 0.04);
+    playTone(330, 0, 0.13, "triangle", 0.07);
+    playTone(740, 0.09, 0.15, "square", 0.075);
+    playTone(990, 0.22, 0.14, "sawtooth", 0.055);
   }
 
   function playItemSound() {
-    playTone(660, 0, 0.07, "square", 0.04);
-    playTone(880, 0.08, 0.08, "square", 0.045);
+    playTone(660, 0, 0.1, "square", 0.065);
+    playTone(880, 0.1, 0.12, "square", 0.07);
   }
 
   function playRunSound() {
-    playTone(260, 0, 0.06, "triangle", 0.05);
-    playTone(210, 0.08, 0.06, "triangle", 0.04);
+    playTone(260, 0, 0.1, "triangle", 0.065);
+    playTone(210, 0.12, 0.1, "triangle", 0.055);
   }
 
   function playDefeatSound() {
-    playTone(560, 0, 0.08, "triangle", 0.06);
-    playTone(280, 0.09, 0.18, "triangle", 0.06);
+    playTone(560, 0, 0.12, "triangle", 0.08);
+    playTone(280, 0.13, 0.24, "triangle", 0.08);
   }
 
   function playLevelUpSound() {
-    playTone(523, 0, 0.12, "square", 0.05);
-    playTone(659, 0.1, 0.12, "square", 0.05);
-    playTone(784, 0.2, 0.14, "square", 0.06);
-    playTone(1046, 0.34, 0.28, "triangle", 0.07);
-    playTone(1318, 0.42, 0.2, "sine", 0.04);
+    playTone(523, 0, 0.16, "square", 0.075);
+    playTone(659, 0.13, 0.16, "square", 0.075);
+    playTone(784, 0.26, 0.18, "square", 0.085);
+    playTone(1046, 0.44, 0.32, "triangle", 0.09);
+    playTone(1318, 0.56, 0.24, "sine", 0.06);
   }
 
   function playInnSound() {
-    playTone(392, 0, 0.24, "sine", 0.045);
-    playTone(523, 0.22, 0.28, "sine", 0.05);
-    playTone(659, 0.48, 0.32, "sine", 0.045);
-    playTone(523, 0.82, 0.36, "triangle", 0.04);
+    playTone(392, 0, 0.28, "sine", 0.065);
+    playTone(523, 0.26, 0.32, "sine", 0.07);
+    playTone(659, 0.56, 0.36, "sine", 0.065);
+    playTone(523, 0.94, 0.4, "triangle", 0.055);
   }
 
   function handlePlayerDefeat() {
@@ -2866,20 +3020,28 @@
     }
   }
 
-  function loadGame() {
+  function loadGame(options = {}) {
     let payload;
 
     try {
       payload = JSON.parse(localStorage.getItem(SAVE_KEY));
     } catch (error) {
       console.error(error);
-      showFieldMessage("", "ロードデータを読めなかった。");
-      return;
+      if (options.fromTitle) {
+        showTitleNotice("ロードデータを読めなかった。");
+      } else {
+        showFieldMessage("", "ロードデータを読めなかった。");
+      }
+      return false;
     }
 
     if (!isValidSave(payload)) {
-      showFieldMessage("", "ロードデータが見つからない。");
-      return;
+      if (options.fromTitle) {
+        showTitleNotice("ロードデータが見つからない。");
+      } else {
+        showFieldMessage("", "ロードデータが見つからない。");
+      }
+      return false;
     }
 
     const loadedLevel = payload.player.level;
@@ -2950,9 +3112,11 @@
     if (hasEquippedGear(state.player)) {
       syncEquipmentStats();
     }
+    hideTitleScreen();
     setBattleMessage("ロードした。");
     render();
     showFieldMessage("", "ロードした。");
+    return true;
   }
 
   function isValidSave(payload) {
@@ -2987,17 +3151,7 @@
   }
 
   function resetGame() {
-    if (!window.confirm("最初から始めますか？")) {
-      return;
-    }
-
-    state = createInitialState();
-    battleCommandView = "root";
-    pendingBattleAction = null;
-    controlsLocked = false;
-    setBattleMessage("新しく冒険を始めた。");
-    render();
-    maybeStartTutorial();
+    startNewGame({ confirm: true });
   }
 
   function draw() {
@@ -3146,19 +3300,56 @@
     }
 
     if (entity.kind === "door") {
-      drawNameplate(entity.name, screenX, screenY);
+      drawBuilding(entity, screenX, screenY);
+      return;
+    }
+
+    if (entity.kind === "shop" || entity.kind === "inn") {
+      drawBuilding(entity, screenX, screenY);
       return;
     }
 
     if (entity.kind === "boss") {
       drawCharacter(screenX, screenY, entity.body || "#835b33", entity.hair || "#2f2a22");
       drawBossMark(screenX, screenY);
-      drawNameplate(entity.name, screenX, screenY);
       return;
     }
 
     drawCharacter(screenX, screenY, entity.body, entity.hair);
     drawNameplate(entity.name, screenX, screenY);
+  }
+
+  function drawBuilding(entity, x, y) {
+    const px = x * TILE_SIZE;
+    const py = y * TILE_SIZE;
+    const roofColor = entity.kind === "inn" ? "#b84f42" : entity.shopType === "equipment" ? "#6c6875" : "#7a6553";
+    const wallColor = entity.kind === "door" ? "#d7ba7a" : "#c9ad79";
+
+    ctx.fillStyle = "rgba(35, 45, 38, 0.22)";
+    ctx.fillRect(px + 2, py + 27, 28, 4);
+    ctx.fillStyle = roofColor;
+    ctx.fillRect(px + 3, py + 5, 26, 9);
+    ctx.fillStyle = wallColor;
+    ctx.fillRect(px + 5, py + 13, 22, 16);
+    ctx.fillStyle = "#5d3c28";
+    ctx.fillRect(px + 13, py + 18, 7, 11);
+    ctx.fillStyle = "#fffaf1";
+    ctx.fillRect(px + 8, py + 15, 6, 5);
+    ctx.fillRect(px + 19, py + 15, 5, 5);
+
+    const label = entity.buildingLabel || entity.name;
+    if (label) {
+      ctx.save();
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const width = Math.max(24, ctx.measureText(label).width + 6);
+      ctx.fillStyle = "#15191f";
+      ctx.fillRect(px + 16 - width / 2, py + 1, width, 12);
+      ctx.fillStyle = "#fffaf1";
+      ctx.fillText(label, px + 16, py + 7);
+      ctx.restore();
+    }
   }
 
   function drawBossMark(x, y) {
@@ -3862,8 +4053,14 @@
   }
 
   function handleKeyDown(event) {
+    unlockAudio();
+
     if (BLOCKED_KEYS.has(event.key)) {
       event.preventDefault();
+    }
+
+    if (titleScreenVisible) {
+      return;
     }
 
     if (activeMessage) {
@@ -4002,9 +4199,19 @@
 
   function bindEvents() {
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("pointerdown", unlockAudio);
     window.addEventListener("pointerup", stopTouchMove);
     window.addEventListener("pointercancel", stopTouchMove);
     window.addEventListener("blur", stopTouchMove);
+    ui.titleNewGameButton.addEventListener("click", () => {
+      unlockAudio();
+      startNewGame({ confirm: false });
+    });
+    ui.titleContinueButton.addEventListener("click", () => {
+      unlockAudio();
+      loadGame({ fromTitle: true });
+    });
+    ui.titleHowToButton.addEventListener("click", toggleHowTo);
     ui.interactButton.addEventListener("click", interact);
     ui.fightButton.addEventListener("click", openBattleActionMenu);
     ui.attackButton.addEventListener("click", handleBattlePrimaryButton);
@@ -4057,7 +4264,7 @@
   bindEvents();
   render();
   window.setTimeout(() => {
-    if (!localStorage.getItem(SAVE_KEY)) {
+    if (!titleScreenVisible && !localStorage.getItem(SAVE_KEY)) {
       maybeStartTutorial();
     }
   }, 250);

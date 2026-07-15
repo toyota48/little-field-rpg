@@ -3,17 +3,42 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Little Field RPG</title>
+    <title>豊田の逆襲</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%232f7d6b'/%3E%3Cpath d='M8 23h16v4H8zM10 8h12v15H10z' fill='%23fffaf1'/%3E%3Cpath d='M14 11h4v4h-4z' fill='%23b84f42'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="./styles.css">
     <script src="./game.js" defer></script>
   </head>
   <body>
+    <section id="titleScreen" class="title-screen" aria-label="title screen">
+      <div class="title-card">
+        <div class="title-scene" aria-hidden="true">
+          <span class="title-hero"></span>
+          <span class="title-castle"></span>
+          <span class="title-shadow"></span>
+        </div>
+        <p class="eyebrow">2D Browser RPG</p>
+        <h1>豊田の逆襲</h1>
+        <p class="title-copy">小さな町から始まる、レトロ風RPG。</p>
+        <div class="title-actions">
+          <button id="titleNewGameButton" type="button">ニューゲーム</button>
+          <button id="titleContinueButton" type="button">続きから</button>
+          <button id="titleHowToButton" type="button" class="subtle">遊び方</button>
+        </div>
+        <p id="titleNotice" class="title-notice" aria-live="polite"></p>
+        <section id="titleHowToPanel" class="title-howto" hidden>
+          <h2>遊び方</h2>
+          <p>矢印キー/WASD、またはスマホの十字キーで移動します。決定ボタンで会話、宝箱、建物を調べられます。</p>
+          <p>戦闘では「たたかう」「どうぐ」「逃げる」を選びます。「たたかう」から攻撃、特技、魔法を選べます。</p>
+          <p>町で準備を整え、草原、森、洞窟へ進みましょう。地図はメニューの「アイテム」から確認できます。</p>
+        </section>
+      </div>
+    </section>
+
     <main class="app-shell">
       <header class="topbar">
         <div>
           <p class="eyebrow">2D Browser RPG</p>
-          <h1>Little Field RPG</h1>
+          <h1>豊田の逆襲</h1>
         </div>
         <button id="menuButton" class="mobile-menu-button" type="button" aria-controls="mobileMenuPanel" aria-expanded="false">メニュー</button>
         <div class="save-controls" aria-label="save controls">
