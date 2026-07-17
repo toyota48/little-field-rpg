@@ -82,6 +82,18 @@ button.guided-command {
   animation: guidedPulse 920ms ease-in-out infinite;
 }
 
+button.audio-enabled {
+  border-color: #4a76c6;
+  background: #4a76c6;
+  color: #fffaf1;
+}
+
+button.audio-unavailable {
+  border-color: var(--danger);
+  background: #f7d9d4;
+  color: var(--danger);
+}
+
 .title-screen {
   position: fixed;
   inset: 0;
@@ -128,7 +140,7 @@ button.guided-command {
 
 .title-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -258,9 +270,9 @@ h2 {
 
 .save-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(86px, 1fr));
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
   gap: 8px;
-  min-width: min(100%, 312px);
+  min-width: min(100%, 424px);
 }
 
 .mobile-menu-button,
@@ -830,7 +842,7 @@ dd {
 
   .mobile-menu-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
 

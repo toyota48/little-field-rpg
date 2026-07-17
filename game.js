@@ -394,6 +394,7 @@
   let activeEffect = null;
   let audioContext = null;
   let bgmEnabled = false;
+  let audioUnavailable = false;
   let bgmTrackId = null;
   let bgmTimer = null;
   let bgmStep = 0;
@@ -407,6 +408,7 @@
     titleScreen: document.getElementById("titleScreen"),
     titleNewGameButton: document.getElementById("titleNewGameButton"),
     titleContinueButton: document.getElementById("titleContinueButton"),
+    titleAudioButton: document.getElementById("titleAudioButton"),
     titleHowToButton: document.getElementById("titleHowToButton"),
     titleHowToPanel: document.getElementById("titleHowToPanel"),
     titleNotice: document.getElementById("titleNotice"),
@@ -454,6 +456,7 @@
     backButton: document.getElementById("backButton"),
     itemButton: document.getElementById("itemButton"),
     runButton: document.getElementById("runButton"),
+    audioButton: document.getElementById("audioButton"),
     saveButton: document.getElementById("saveButton"),
     loadButton: document.getElementById("loadButton"),
     resetButton: document.getElementById("resetButton"),
@@ -477,6 +480,7 @@
     menuButton: document.getElementById("menuButton"),
     mobileMenuPanel: document.getElementById("mobileMenuPanel"),
     menuCloseButton: document.getElementById("menuCloseButton"),
+    menuAudioButton: document.getElementById("menuAudioButton"),
     menuSaveButton: document.getElementById("menuSaveButton"),
     menuLoadButton: document.getElementById("menuLoadButton"),
     menuResetButton: document.getElementById("menuResetButton"),
@@ -4442,13 +4446,46 @@
     return audioContext;
   }
 
-  function unlockAudio() {
+  function updateAudioButtons() {
+    const label = audioUnavailable ? "音声不可" : bgmEnabled ? "音: ON" : "音をオン";
+    [ui.titleAudioButton, ui.audioButton, ui.menuAudioButton].forEach((button) => {
+      if (!button) {
+        return;
+      }
+      button.textContent = label;
+      button.classList.toggle("audio-enabled", bgmEnabled);
+      button.classList.toggle("audio-unavailable", audioUnavailable);
+    });
+  }
+
+  async function unlockAudio(options = {}) {
+    audioUnavailable = false;
+    [ui.titleAudioButton, ui.audioButton, ui.menuAudioButton].forEach((button) => {
+      if (button) {
+        button.textContent = "音を確認中";
+      }
+    });
     const audio = getAudioContext();
-    if (audio?.state === "suspended") {
-      audio.resume().catch(() => {});
+    if (!audio) {
+      audioUnavailable = true;
+      bgmEnabled = false;
+      updateAudioButtons();
+      showTitleNotice("このブラウザでは音声を再生できない可能性があります。");
+      return false;
     }
-    bgmEnabled = Boolean(audio);
+
+    bgmEnabled = true;
+    updateAudioButtons();
+    if (audio.state === "suspended") {
+      audio.resume()
+        .then(updateBgm)
+        .catch((error) => console.warn("Audio resume failed", error));
+    }
     updateBgm();
+    if (options.confirm) {
+      playAudioReadySound();
+    }
+    return true;
   }
 
   function playTone(frequency, startOffset, duration, type, volume) {
@@ -4546,7 +4583,7 @@
     const stepIndex = bgmStep % track.melody.length;
     const startAt = audio.currentTime + 0.035;
     master.gain.cancelScheduledValues(startAt);
-    master.gain.linearRampToValueAtTime(track.volume, startAt + 0.04);
+    master.gain.linearRampToValueAtTime(1, startAt + 0.04);
 
     const melodyNote = track.melody[stepIndex];
     const bassNote = track.bass[stepIndex % track.bass.length];
@@ -4636,6 +4673,12 @@
     }
 
     startBgm(nextTrack);
+  }
+
+  function playAudioReadySound() {
+    playTone(523, 0, 0.08, "square", 0.085);
+    playTone(659, 0.08, 0.08, "square", 0.085);
+    playTone(784, 0.16, 0.12, "triangle", 0.075);
   }
 
   function playSlashSound() {
@@ -5694,6 +5737,7 @@
     const questText = currentQuestTitle();
     const usableItemCount = Object.keys(TOOL_ITEMS).filter((itemId) => itemCount(itemId) > 0 && canUseToolItem(itemId)).length;
 
+    updateAudioButtons();
     document.body.classList.toggle("battle-focus", isBattle);
     ui.mapValue.textContent = currentMap().name;
     ui.fieldMapBadge.textContent = currentMap().name;
@@ -6055,6 +6099,16 @@
     touchMoveDirection = null;
   }
 
+  function handleAudioButtonClick(event) {
+    if (!["titleAudioButton", "audioButton", "menuAudioButton"].includes(event.currentTarget?.id || event.target?.id)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    unlockAudio({ confirm: true });
+  }
+
   function bindEvents() {
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("pointerdown", unlockAudio);
@@ -6069,6 +6123,7 @@
       unlockAudio();
       loadGame({ fromTitle: true });
     });
+    ui.titleAudioButton.addEventListener("click", handleAudioButtonClick);
     ui.titleHowToButton.addEventListener("click", toggleHowTo);
     ui.interactButton.addEventListener("click", interact);
     ui.fightButton.addEventListener("click", openBattleActionMenu);
@@ -6079,11 +6134,14 @@
     ui.itemButton.addEventListener("click", openBattleItemMenu);
     ui.defendButton.addEventListener("click", playerDefend);
     ui.runButton.addEventListener("click", playerRun);
+    ui.audioButton.addEventListener("click", handleAudioButtonClick);
     ui.saveButton.addEventListener("click", saveGame);
     ui.loadButton.addEventListener("click", loadGame);
     ui.resetButton.addEventListener("click", resetGame);
     ui.menuButton.addEventListener("click", openMobileMenu);
     ui.menuCloseButton.addEventListener("click", closeMobileMenu);
+    ui.menuAudioButton.addEventListener("click", handleAudioButtonClick);
+    document.addEventListener("click", handleAudioButtonClick);
     ui.menuSaveButton.addEventListener("click", () => runMobileMenuAction(saveGame));
     ui.menuLoadButton.addEventListener("click", () => runMobileMenuAction(loadGame));
     ui.menuResetButton.addEventListener("click", () => runMobileMenuAction(resetGame));
