@@ -115,6 +115,99 @@
     defeat: 760,
   };
   const BATTLE_TURN_PAUSE = 760;
+  const BGM_TRACKS = {
+    title: {
+      bpm: 92,
+      volume: 0.038,
+      wave: "triangle",
+      bassWave: "sine",
+      melody: ["E5", null, "G5", null, "A5", "G5", "E5", null, "D5", null, "E5", "G5", "B4", null, "E5", null],
+      bass: ["E3", null, null, null, "C3", null, null, null, "D3", null, null, null, "B2", null, null, null],
+      drums: [],
+    },
+    town: {
+      bpm: 96,
+      volume: 0.032,
+      wave: "sine",
+      bassWave: "triangle",
+      melody: ["C5", null, "E5", "G5", null, "E5", "D5", null, "C5", null, "D5", "E5", "G4", null, "C5", null],
+      bass: ["C3", null, null, null, "A2", null, null, null, "F2", null, null, null, "G2", null, null, null],
+      drums: [],
+    },
+    field: {
+      bpm: 118,
+      volume: 0.034,
+      wave: "square",
+      bassWave: "triangle",
+      melody: ["G4", "C5", null, "D5", "E5", null, "D5", "C5", "A4", null, "C5", "D5", "G4", null, "E4", null],
+      bass: ["C3", null, "C3", null, "G2", null, "G2", null, "A2", null, "A2", null, "F2", null, "G2", null],
+      drums: [0, 4, 8, 12],
+    },
+    forest: {
+      bpm: 104,
+      volume: 0.031,
+      wave: "triangle",
+      bassWave: "sine",
+      melody: ["A4", null, "C5", null, "E5", null, "D5", null, "A4", "C5", null, "G4", "E4", null, "A4", null],
+      bass: ["A2", null, null, null, "F2", null, null, null, "D3", null, null, null, "E3", null, null, null],
+      drums: [4, 12],
+    },
+    cave: {
+      bpm: 86,
+      volume: 0.035,
+      wave: "sawtooth",
+      bassWave: "sine",
+      melody: ["E4", null, null, "G4", null, "F4", null, null, "D4", null, "E4", null, "C4", null, null, "B3"],
+      bass: ["E2", null, "E2", null, "D2", null, null, null, "C2", null, "C2", null, "B1", null, null, null],
+      drums: [0, 8],
+    },
+    port: {
+      bpm: 102,
+      volume: 0.033,
+      wave: "triangle",
+      bassWave: "sine",
+      melody: ["D5", null, "F5", "A5", null, "G5", "F5", null, "E5", null, "D5", "A4", "C5", null, "D5", null],
+      bass: ["D3", null, null, null, "G2", null, null, null, "A2", null, null, null, "D3", null, null, null],
+      drums: [0, 8],
+    },
+    battle: {
+      bpm: 146,
+      volume: 0.04,
+      wave: "square",
+      bassWave: "sawtooth",
+      melody: ["E5", "G5", "E5", "B4", "D5", "E5", null, "G5", "A5", "G5", "E5", "D5", "B4", null, "D5", null],
+      bass: ["E2", null, "E2", null, "D2", null, "D2", null, "C2", null, "C2", null, "B1", null, "B1", null],
+      drums: [0, 2, 4, 6, 8, 10, 12, 14],
+    },
+    boss: {
+      bpm: 158,
+      volume: 0.044,
+      wave: "sawtooth",
+      bassWave: "square",
+      melody: ["C5", "D#5", "G5", null, "F#5", "G5", "A#5", null, "G5", "F#5", "D#5", "C5", "D5", null, "G4", null],
+      bass: ["C2", "C2", null, "C2", "A#1", "A#1", null, "A#1", "G1", "G1", null, "G1", "F#1", null, "G1", null],
+      drums: [0, 2, 4, 6, 8, 10, 12, 14],
+    },
+  };
+  const NOTE_OFFSETS = {
+    C: 0,
+    "C#": 1,
+    Db: 1,
+    D: 2,
+    "D#": 3,
+    Eb: 3,
+    E: 4,
+    F: 5,
+    "F#": 6,
+    Gb: 6,
+    G: 7,
+    "G#": 8,
+    Ab: 8,
+    A: 9,
+    "A#": 10,
+    Bb: 10,
+    B: 11,
+  };
   const BATTLE_ACTION_DETAILS = {
     fullSlash: {
       category: "skill",
@@ -300,6 +393,11 @@
 
   let activeEffect = null;
   let audioContext = null;
+  let bgmEnabled = false;
+  let bgmTrackId = null;
+  let bgmTimer = null;
+  let bgmStep = 0;
+  let bgmMasterGain = null;
   let activeMessage = null;
   let controlsLocked = false;
   let battleMessage = "町の南から草原へ向かえる。";
@@ -1778,6 +1876,16 @@
     if (!caveBoss?.setFlags?.caveBossDefeated || !caveBoss?.grantKeyItems?.includes("portPass")) {
       errors.push("Cave boss must set caveBossDefeated and grant portPass.");
     }
+    Object.entries(BGM_TRACKS).forEach(([trackId, track]) => {
+      if (!track.melody?.length || !track.bass?.length || !Number.isFinite(track.bpm)) {
+        errors.push(`BGM track ${trackId} is incomplete.`);
+      }
+      [...(track.melody || []), ...(track.bass || [])].filter(Boolean).forEach((note) => {
+        if (!noteFrequency(note)) {
+          errors.push(`BGM track ${trackId} has invalid note ${note}.`);
+        }
+      });
+    });
 
     return {
       ok: errors.length === 0,
@@ -2076,6 +2184,7 @@
     ui.screenFrame.classList.remove("has-message");
     setBattleMessage("新しく冒険を始めた。");
     render();
+    updateBgm();
     maybeStartTutorial();
     return true;
   }
@@ -2928,6 +3037,7 @@
     state.player.y = exit.spawn.y;
     setBattleMessage(exit.message);
     markVisitedMap(exit.to);
+    updateBgm();
     const message = !getFlag(exit.warningFlag) && exit.warningMessage
       ? `${exit.warningMessage}\n${exit.message}`
       : exit.message;
@@ -3106,6 +3216,7 @@
     state.player.y = entity.spawn.y;
     markVisitedMap(entity.to);
     setBattleMessage(entity.message || "中に入った。");
+    updateBgm();
     showFieldMessage(entity.name, entity.message || "中に入った。");
     render();
   }
@@ -3347,6 +3458,7 @@
     battleCommandView = "root";
     pendingBattleAction = null;
     setBattleMessage(`${enemy.name}が現れた。`);
+    updateBgm();
     if (enemy.boss) {
       playBossStartSound();
     }
@@ -3413,6 +3525,7 @@
     state.mapId = "town";
     state.player.x = 5;
     state.player.y = 5;
+    updateBgm();
     render();
 
     await say("ルカ", "よし、今の流れで戦闘の基本は大丈夫だ。");
@@ -3968,6 +4081,7 @@
         state.battle = null;
         battleCommandView = "root";
         addLog(`${enemyName}から逃げ切った。`);
+        updateBgm();
         render();
         return;
       }
@@ -4146,6 +4260,7 @@
     state.mode = "explore";
     state.battle = null;
     battleCommandView = "root";
+    updateBgm();
     render();
 
     if (battleMeta.bossId && battleMeta.victoryMessage) {
@@ -4332,6 +4447,8 @@
     if (audio?.state === "suspended") {
       audio.resume().catch(() => {});
     }
+    bgmEnabled = Boolean(audio);
+    updateBgm();
   }
 
   function playTone(frequency, startOffset, duration, type, volume) {
@@ -4354,6 +4471,171 @@
     gain.connect(audio.destination);
     oscillator.start(startAt);
     oscillator.stop(endAt + 0.03);
+  }
+
+  function noteFrequency(note) {
+    if (!note) {
+      return null;
+    }
+
+    const match = String(note).match(/^([A-G](?:#|b)?)(-?\d)$/);
+    if (!match) {
+      return null;
+    }
+
+    const [, pitch, octaveText] = match;
+    const octave = Number(octaveText);
+    const semitone = NOTE_OFFSETS[pitch];
+    if (!Number.isFinite(semitone) || !Number.isFinite(octave)) {
+      return null;
+    }
+
+    const midiNumber = (octave + 1) * 12 + semitone;
+    return 440 * 2 ** ((midiNumber - 69) / 12);
+  }
+
+  function getBgmMasterGain() {
+    const audio = getAudioContext();
+    if (!audio) {
+      return null;
+    }
+
+    if (!bgmMasterGain) {
+      bgmMasterGain = audio.createGain();
+      bgmMasterGain.gain.setValueAtTime(0.001, audio.currentTime);
+      bgmMasterGain.connect(audio.destination);
+    }
+
+    return bgmMasterGain;
+  }
+
+  function scheduleBgmFrequency(frequency, startAt, duration, type, volume) {
+    const audio = getAudioContext();
+    const master = getBgmMasterGain();
+    if (!audio || !master || !frequency) {
+      return;
+    }
+
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+    const endAt = startAt + duration;
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gain.gain.setValueAtTime(0.001, startAt);
+    gain.gain.linearRampToValueAtTime(volume, startAt + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, Math.max(startAt + 0.03, endAt - 0.025));
+    oscillator.connect(gain);
+    gain.connect(master);
+    oscillator.start(startAt);
+    oscillator.stop(endAt + 0.02);
+  }
+
+  function scheduleBgmNote(note, startAt, duration, type, volume) {
+    scheduleBgmFrequency(noteFrequency(note), startAt, duration, type, volume);
+  }
+
+  function scheduleBgmStep() {
+    const audio = getAudioContext();
+    const track = BGM_TRACKS[bgmTrackId];
+    const master = getBgmMasterGain();
+    if (!audio || !track || !master) {
+      return;
+    }
+
+    const stepDuration = 60 / track.bpm / 2;
+    const stepIndex = bgmStep % track.melody.length;
+    const startAt = audio.currentTime + 0.035;
+    master.gain.cancelScheduledValues(startAt);
+    master.gain.linearRampToValueAtTime(track.volume, startAt + 0.04);
+
+    const melodyNote = track.melody[stepIndex];
+    const bassNote = track.bass[stepIndex % track.bass.length];
+    if (melodyNote) {
+      scheduleBgmNote(melodyNote, startAt, stepDuration * 0.78, track.wave, track.volume * 0.9);
+    }
+    if (bassNote) {
+      scheduleBgmNote(bassNote, startAt, stepDuration * 0.9, track.bassWave, track.volume * 0.58);
+    }
+    if (track.drums.includes(stepIndex)) {
+      scheduleBgmFrequency(70, startAt, 0.055, "sine", track.volume * 0.72);
+      scheduleBgmFrequency(1800, startAt + 0.018, 0.035, "square", track.volume * 0.18);
+    }
+
+    bgmStep += 1;
+  }
+
+  function stopBgm() {
+    if (bgmTimer) {
+      window.clearInterval(bgmTimer);
+      bgmTimer = null;
+    }
+
+    const audio = audioContext;
+    if (audio && bgmMasterGain) {
+      const now = audio.currentTime;
+      bgmMasterGain.gain.cancelScheduledValues(now);
+      bgmMasterGain.gain.linearRampToValueAtTime(0.001, now + 0.18);
+    }
+
+    bgmTrackId = null;
+    bgmStep = 0;
+  }
+
+  function startBgm(trackId) {
+    if (!bgmEnabled || bgmTrackId === trackId) {
+      return;
+    }
+
+    const track = BGM_TRACKS[trackId];
+    const audio = getAudioContext();
+    if (!track || !audio) {
+      return;
+    }
+
+    stopBgm();
+    bgmTrackId = trackId;
+    bgmStep = 0;
+    scheduleBgmStep();
+    const stepDuration = 60 / track.bpm / 2;
+    bgmTimer = window.setInterval(scheduleBgmStep, Math.max(90, stepDuration * 1000));
+  }
+
+  function selectBgmTrack() {
+    if (titleScreenVisible) {
+      return "title";
+    }
+
+    if (state.mode === "battle") {
+      return state.battle?.enemy?.boss ? "boss" : "battle";
+    }
+
+    if (state.mapId === "town" || state.mapId === "villageHouse") {
+      return "town";
+    }
+    if (state.mapId === "portTown") {
+      return "port";
+    }
+    if (["forest", "forestDepth"].includes(state.mapId)) {
+      return "forest";
+    }
+    if (["cave", "caveB1", "caveDeep"].includes(state.mapId)) {
+      return "cave";
+    }
+    return "field";
+  }
+
+  function updateBgm() {
+    if (!bgmEnabled) {
+      return;
+    }
+
+    const nextTrack = selectBgmTrack();
+    if (!nextTrack) {
+      stopBgm();
+      return;
+    }
+
+    startBgm(nextTrack);
   }
 
   function playSlashSound() {
@@ -4454,6 +4736,7 @@
     battleCommandView = "root";
     pendingBattleAction = null;
     setBattleMessage(`力尽きた。町で目を覚ました。-${lostGold}G`);
+    updateBgm();
     render();
     showFieldMessage("", `力尽きた。町で目を覚ました。\n${lostGold}Gを失った。`);
   }
@@ -4611,6 +4894,7 @@
     markVisitedMap(state.mapId);
     hideTitleScreen();
     setBattleMessage("ロードした。");
+    updateBgm();
     render();
     showFieldMessage("", "ロードした。");
     return true;
