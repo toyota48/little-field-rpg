@@ -28,8 +28,8 @@
         <section id="titleHowToPanel" class="title-howto" hidden>
           <h2>遊び方</h2>
           <p>矢印キー/WASD、またはスマホの十字キーで移動します。決定ボタンで会話、宝箱、建物を調べられます。</p>
-          <p>戦闘では「たたかう」「どうぐ」「逃げる」を選びます。「たたかう」から攻撃、特技、魔法を選べます。</p>
-          <p>町で準備を整え、草原、森、洞窟へ進みましょう。地図はメニューの「アイテム」から確認できます。</p>
+          <p>戦闘では「たたかう」「どうぐ」「ぼうぎょ」「逃げる」を選びます。「たたかう」から攻撃、特技、魔法を選べます。</p>
+          <p>町で情報を集め、森の奥、岩山の洞窟、港町へ進みましょう。地図はメニューの「アイテム」、目的は「冒険の記録」から確認できます。</p>
         </section>
       </div>
     </section>
@@ -63,6 +63,7 @@
         <div class="mobile-menu-tabs" role="tablist" aria-label="menu tabs">
           <button id="mobileStatusTab" type="button" role="tab" aria-selected="true">ステータス</button>
           <button id="mobileItemsTab" type="button" role="tab" aria-selected="false">アイテム</button>
+          <button id="mobileQuestTab" type="button" role="tab" aria-selected="false">冒険の記録</button>
         </div>
 
         <section id="mobileStatusPanel" class="mobile-status-panel menu-tab-panel" aria-label="mobile status">
@@ -107,6 +108,10 @@
             <div>
               <dt>薬草</dt>
               <dd><span id="mobileHerbValue">1</span> 個</dd>
+            </div>
+            <div>
+              <dt>状態</dt>
+              <dd id="mobileStatusValue">正常</dd>
             </div>
             <div class="equipment-stat">
               <dt>装備</dt>
@@ -164,6 +169,21 @@
             </article>
           </div>
         </section>
+
+        <section id="mobileQuestPanel" class="mobile-quest-panel menu-tab-panel" aria-label="mobile quest log" hidden>
+          <div class="panel-heading">
+            <h2>冒険の記録</h2>
+            <span id="mobileChapterValue" class="mode-pill">第1章</span>
+          </div>
+          <section class="quest-current">
+            <h3>現在の目的</h3>
+            <p id="mobileCurrentQuest">町の長老に話を聞こう</p>
+          </section>
+          <section class="quest-history">
+            <h3>達成済み</h3>
+            <ul id="mobileQuestList"></ul>
+          </section>
+        </section>
       </section>
 
       <section class="game-layout" aria-label="game area">
@@ -171,6 +191,7 @@
           <div id="screenFrame" class="screen-frame">
             <canvas id="gameCanvas" width="512" height="384" aria-label="game screen"></canvas>
             <div id="fieldMapBadge" class="field-map-badge">町</div>
+            <div id="fieldQuestBadge" class="field-quest-badge">町の長老に話を聞こう</div>
             <div id="fieldFade" class="field-fade" hidden></div>
             <section id="fieldMessage" class="field-message" aria-live="polite" hidden>
               <div id="messageSpeaker" class="message-speaker"></div>
@@ -202,11 +223,13 @@
                   <span id="touchMpBar"></span>
                 </div>
               </div>
+              <span id="touchStatusText" class="touch-status-text">状態: 正常</span>
             </div>
             <button id="touchInteractButton" class="touch-button touch-action" type="button">決定</button>
             <div id="battleTouchMenu" class="battle-touch-menu" hidden>
               <button id="touchFightButton" class="battle-command" type="button">たたかう</button>
               <button id="touchItemButton" class="battle-command" type="button">どうぐ</button>
+              <button id="touchDefendButton" class="battle-command" type="button">ぼうぎょ</button>
               <button id="touchRunButton" class="battle-command" type="button">逃げる</button>
               <button id="touchAttackButton" class="battle-command" type="button">攻撃</button>
               <button id="touchSkillButton" class="battle-command" type="button">特技</button>
@@ -260,6 +283,10 @@
                 <dt>薬草</dt>
                 <dd><span id="herbValue">1</span> 個</dd>
               </div>
+              <div>
+                <dt>状態</dt>
+                <dd id="statusValue">正常</dd>
+              </div>
               <div class="equipment-stat">
                 <dt>装備</dt>
                 <dd id="equipmentValue">武器: なし / 防具: なし / 装飾: なし</dd>
@@ -306,6 +333,7 @@
             <div id="battleRootMenu" class="command-grid battle-root-grid" hidden>
               <button id="fightButton" type="button">たたかう</button>
               <button id="itemButton" type="button">どうぐ</button>
+              <button id="defendButton" type="button">ぼうぎょ</button>
               <button id="runButton" type="button">逃げる</button>
             </div>
             <div id="battleActionMenu" class="command-grid battle-action-grid" hidden>

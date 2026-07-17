@@ -312,7 +312,28 @@ h2 {
   pointer-events: none;
 }
 
+.field-quest-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  max-width: min(72%, 360px);
+  padding: 5px 10px;
+  border: 2px solid #fffaf1;
+  border-radius: 4px;
+  background: rgba(17, 19, 24, 0.84);
+  color: #fffaf1;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
 body.battle-focus .field-map-badge {
+  display: none;
+}
+
+body.battle-focus .field-quest-badge {
   display: none;
 }
 
@@ -507,7 +528,7 @@ body.battle-focus .field-map-badge {
 
 .battle-touch-menu {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
 }
@@ -674,7 +695,7 @@ dd {
 }
 
 .battle-root-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .battle-action-grid {
@@ -824,6 +845,10 @@ dd {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .mobile-menu-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .mobile-menu-tabs button[aria-selected="true"],
   .item-category-tabs button[aria-selected="true"] {
     background: #fffaf1;
@@ -836,7 +861,8 @@ dd {
   }
 
   .mobile-status-panel,
-  .mobile-items-panel {
+  .mobile-items-panel,
+  .mobile-quest-panel {
     padding: 12px;
     border: 2px solid #fffaf1;
     border-radius: 4px;
@@ -893,6 +919,55 @@ dd {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     gap: 10px;
+  }
+
+  .mobile-quest-panel {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+  }
+
+  .quest-current,
+  .quest-history {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid #dfd1b9;
+    border-radius: 6px;
+    background: #fffdf8;
+  }
+
+  .quest-current h3,
+  .quest-history h3 {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  .quest-current p {
+    margin: 0;
+    color: var(--ink);
+    font-weight: 900;
+    line-height: 1.55;
+  }
+
+  .quest-history ul {
+    display: grid;
+    gap: 6px;
+    max-height: min(34dvh, 280px);
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+  }
+
+  .quest-history li {
+    padding: 8px 10px;
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    background: #f8f0dc;
+    color: var(--muted);
+    font-weight: 800;
+    line-height: 1.45;
   }
 
   .inventory-layout {
@@ -1104,6 +1179,11 @@ dd {
     font-weight: 800;
   }
 
+  .touch-status-text {
+    grid-column: 1 / -1;
+    font-size: 0.82rem;
+  }
+
   body.battle-focus .touch-action {
     width: 100%;
     min-height: 64px;
@@ -1157,6 +1237,10 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .mobile-menu-tabs {
+    grid-template-columns: 1fr;
+  }
+
   .inventory-layout {
     grid-template-columns: 1fr;
   }
@@ -1196,7 +1280,7 @@ dd {
   }
 
   body.battle-focus .battle-touch-menu {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   body.battle-focus .battle-touch-menu.action-menu {
