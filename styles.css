@@ -270,9 +270,9 @@ h2 {
 
 .save-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(86px, 1fr));
+  grid-template-columns: repeat(5, minmax(78px, 1fr));
   gap: 8px;
-  min-width: min(100%, 424px);
+  min-width: min(100%, 486px);
 }
 
 .mobile-menu-button,
@@ -527,7 +527,7 @@ body.battle-focus .field-quest-badge {
   width: 0%;
   height: 100%;
   border-radius: inherit;
-  transition: width 160ms ease;
+  transition: width 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .touch-hp-meter span {
@@ -681,7 +681,7 @@ dd {
   width: 0%;
   height: 100%;
   border-radius: inherit;
-  transition: width 160ms ease;
+  transition: width 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .hp-meter span {
@@ -698,6 +698,45 @@ dd {
 
 .enemy-meter span {
   background: #7c3f5a;
+}
+
+.status-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 26px;
+  margin-top: 10px;
+}
+
+.status-icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 24px;
+  padding: 2px 7px;
+  border: 1px solid #15191f;
+  border-radius: 999px;
+  background: #15191f;
+  color: #fffaf1;
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.status-icon.poison {
+  background: #6f3b85;
+}
+
+.status-icon.sleep {
+  background: #3e639f;
+}
+
+.status-icon.paralysis {
+  background: #b5832a;
+}
+
+.status-icon.burn {
+  background: #b84f42;
 }
 
 .command-grid {
@@ -842,7 +881,7 @@ dd {
 
   .mobile-menu-actions {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
   }
 
@@ -1194,6 +1233,11 @@ dd {
   .touch-status-text {
     grid-column: 1 / -1;
     font-size: 0.82rem;
+  }
+
+  .touch-status-icons {
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
 
   body.battle-focus .touch-action {

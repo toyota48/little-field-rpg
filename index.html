@@ -44,6 +44,7 @@
         <button id="menuButton" class="mobile-menu-button" type="button" aria-controls="mobileMenuPanel" aria-expanded="false">メニュー</button>
         <div class="save-controls" aria-label="save controls">
           <button id="audioButton" type="button">音をオン</button>
+          <button id="questToggleButton" type="button" class="subtle">目的OFF</button>
           <button id="saveButton" type="button">セーブ</button>
           <button id="loadButton" type="button">ロード</button>
           <button id="resetButton" type="button" class="subtle">最初から</button>
@@ -58,6 +59,7 @@
 
         <div class="mobile-menu-actions" aria-label="save controls">
           <button id="menuAudioButton" type="button">音をオン</button>
+          <button id="menuQuestToggleButton" type="button">目的OFF</button>
           <button id="menuSaveButton" type="button">セーブ</button>
           <button id="menuLoadButton" type="button">ロード</button>
           <button id="menuResetButton" type="button" class="subtle">最初から</button>
@@ -143,6 +145,8 @@
             </div>
           </div>
 
+          <div id="mobileStatusIcons" class="status-icons" aria-label="status effects"></div>
+
           <section class="ability-detail-panel" aria-label="ability details">
             <h3>能力詳細</h3>
             <dl id="mobileAbilityDetails" class="ability-detail-list"></dl>
@@ -227,6 +231,7 @@
                 </div>
               </div>
               <span id="touchStatusText" class="touch-status-text">状態: 正常</span>
+              <div id="touchStatusIcons" class="status-icons touch-status-icons" aria-label="status effects"></div>
             </div>
             <button id="touchInteractButton" class="touch-button touch-action" type="button">決定</button>
             <div id="battleTouchMenu" class="battle-touch-menu" hidden>
@@ -316,6 +321,8 @@
                 <span id="expBar"></span>
               </div>
             </div>
+
+            <div id="statusIcons" class="status-icons" aria-label="status effects"></div>
           </section>
 
           <section id="enemyPanel" class="panel enemy-panel" hidden>

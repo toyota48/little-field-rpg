@@ -5,7 +5,7 @@
   const VIEW_COLS = 16;
   const VIEW_ROWS = 12;
   const SAVE_KEY = "little-field-rpg-save-v1";
-  const SAVE_VERSION = 7;
+  const SAVE_VERSION = 8;
   const INN_PRICE = 5;
   const HEAL_MAGIC_COST = 3;
   const FULL_SLASH_COST = 3;
@@ -41,6 +41,20 @@
       sellable: true,
       effect: { type: "curePoison" },
     },
+    wakeFlower: {
+      name: "目覚めの花",
+      description: "眠気を払う香りの花。眠り状態を治す。",
+      icon: "花",
+      sellable: true,
+      effect: { type: "cureSleep" },
+    },
+    sparkHerb: {
+      name: "しびれ消し草",
+      description: "手足のしびれを和らげる薬草。麻痺状態を治す。",
+      icon: "痺",
+      sellable: true,
+      effect: { type: "cureParalysis" },
+    },
   };
   const KEY_ITEMS = {
     worldMap: {
@@ -73,6 +87,7 @@
     caveBossDefeated: false,
     portTownReached: false,
     chapter1Completed: false,
+    brokenRoadRock: false,
   };
   const QUEST_STEPS = [
     { id: "talkElder", title: "町の長老に話を聞こう", completeFlags: ["talkedToElder"] },
@@ -108,13 +123,20 @@
   ];
   const EFFECT_DURATIONS = {
     slash: 720,
+    criticalSlash: 920,
     enemyAttack: 780,
     heal: 900,
+    item: 680,
     magicAttack: 860,
+    weakness: 920,
+    statusDamage: 820,
+    statusBurst: 780,
     run: 520,
     defeat: 760,
+    bossIntro: 1050,
+    bossDefeat: 1120,
   };
-  const BATTLE_TURN_PAUSE = 760;
+  const BATTLE_TURN_PAUSE = 840;
   const BGM_TRACKS = {
     title: {
       bpm: 92,
@@ -295,6 +317,20 @@
       minLevel: 1,
       description: "毒消し草を使って毒を治す。",
     },
+    wakeFlower: {
+      category: "item",
+      name: "目覚めの花",
+      costLabel: "どうぐ",
+      minLevel: 1,
+      description: "目覚めの花を使って眠りを治す。",
+    },
+    sparkHerb: {
+      category: "item",
+      name: "しびれ消し草",
+      costLabel: "どうぐ",
+      minLevel: 1,
+      description: "しびれ消し草を使って麻痺を治す。",
+    },
   };
   const EQUIPMENT_ITEMS = {
     copperSword: {
@@ -349,7 +385,8 @@
       slot: "weapon",
       attack: 7,
       wisdom: 12,
-      description: "魔力を高める杖。攻撃力+7、賢さ+12",
+      element: "fire",
+      description: "魔力を高める杖。攻撃力+7、賢さ+12。通常攻撃に炎の力を少し宿す。",
     },
     rockAxe: {
       name: "岩砕きの斧",
@@ -377,15 +414,33 @@
       name: "素早さの腕輪",
       slot: "accessory",
       agility: 8,
-      description: "足さばきを軽くする腕輪。素早さ+8",
+      evasionBonus: 0.035,
+      description: "足さばきを軽くする腕輪。素早さ+8、回避率が少し上がる。",
     },
     powerPendant: {
       name: "力の首飾り",
       slot: "accessory",
       attack: 7,
-      description: "力を引き出す首飾り。攻撃力+7",
+      criticalBonus: 0.012,
+      description: "力を引き出す首飾り。攻撃力+7、会心率が少し上がる。",
     },
   };
+  const EQUIPMENT_SET_BONUSES = [
+    {
+      id: "forestTraveler",
+      name: "森旅人セット",
+      items: ["forestBow", "rangerVest", "wisdomRing"],
+      stats: { agility: 4, dexterity: 4, wisdom: 3 },
+      description: "森人の弓、旅人の服、知恵の指輪を揃えると素早さ・器用さ・賢さが上がる。",
+    },
+    {
+      id: "ironGuard",
+      name: "鉄壁セット",
+      items: ["ironSword", "ironArmor"],
+      stats: { defense: 5 },
+      description: "鉄の剣と鉄のよろいを揃えると防御力が上がる。",
+    },
+  ];
 
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
@@ -424,6 +479,7 @@
     goldValue: document.getElementById("goldValue"),
     herbValue: document.getElementById("herbValue"),
     statusValue: document.getElementById("statusValue"),
+    statusIcons: document.getElementById("statusIcons"),
     equipmentValue: document.getElementById("equipmentValue"),
     hpText: document.getElementById("hpText"),
     hpBar: document.getElementById("hpBar"),
@@ -457,6 +513,7 @@
     itemButton: document.getElementById("itemButton"),
     runButton: document.getElementById("runButton"),
     audioButton: document.getElementById("audioButton"),
+    questToggleButton: document.getElementById("questToggleButton"),
     saveButton: document.getElementById("saveButton"),
     loadButton: document.getElementById("loadButton"),
     resetButton: document.getElementById("resetButton"),
@@ -468,6 +525,7 @@
     touchMpText: document.getElementById("touchMpText"),
     touchMpBar: document.getElementById("touchMpBar"),
     touchStatusText: document.getElementById("touchStatusText"),
+    touchStatusIcons: document.getElementById("touchStatusIcons"),
     battleTouchMenu: document.getElementById("battleTouchMenu"),
     touchFightButton: document.getElementById("touchFightButton"),
     touchDefendButton: document.getElementById("touchDefendButton"),
@@ -481,6 +539,7 @@
     mobileMenuPanel: document.getElementById("mobileMenuPanel"),
     menuCloseButton: document.getElementById("menuCloseButton"),
     menuAudioButton: document.getElementById("menuAudioButton"),
+    menuQuestToggleButton: document.getElementById("menuQuestToggleButton"),
     menuSaveButton: document.getElementById("menuSaveButton"),
     menuLoadButton: document.getElementById("menuLoadButton"),
     menuResetButton: document.getElementById("menuResetButton"),
@@ -512,6 +571,7 @@
     mobileGoldValue: document.getElementById("mobileGoldValue"),
     mobileHerbValue: document.getElementById("mobileHerbValue"),
     mobileStatusValue: document.getElementById("mobileStatusValue"),
+    mobileStatusIcons: document.getElementById("mobileStatusIcons"),
     mobileEquipmentValue: document.getElementById("mobileEquipmentValue"),
     mobileHpText: document.getElementById("mobileHpText"),
     mobileHpBar: document.getElementById("mobileHpBar"),
@@ -533,6 +593,7 @@
     F: { name: "flower", walkable: true, encounter: 0.07 },
     A: { name: "forest floor", walkable: true, encounter: 0.11 },
     B: { name: "cave floor", walkable: true, encounter: 0.15 },
+    H: { name: "hidden passage", walkable: true, encounter: 0.08 },
     P: { name: "path", walkable: true },
     I: { name: "inn floor", walkable: true },
     D: { name: "door", walkable: true },
@@ -668,6 +729,10 @@
           name: "商人",
           x: 12,
           y: 8,
+          timePositions: {
+            day: { x: 12, y: 8 },
+            night: { x: 4, y: 6 },
+          },
           body: "#b87333",
           hair: "#273142",
           dialogues: [
@@ -728,6 +793,19 @@
               ],
             },
           ],
+        },
+        {
+          id: "town-well",
+          kind: "inspect",
+          name: "古い井戸",
+          x: 3,
+          y: 8,
+          messages: [
+            "井戸の底から涼しい風が上がってくる。",
+            "誰かが小さな袋を落としたようだ。中には薬草が1個入っていた。",
+          ],
+          onceId: "town-well-herb",
+          onceItems: { herb: 1 },
         },
         {
           id: "mina",
@@ -855,6 +933,17 @@
           contents: { equipment: "copperSword", gold: 8 },
         },
         {
+          id: "grassland-stone",
+          kind: "inspect",
+          name: "古い石碑",
+          x: 14,
+          y: 13,
+          messages: [
+            "古い石碑には、かすれた文字が刻まれている。",
+            "「森の魔物は炎を嫌う。賢き者の火は、硬い守りにも道を作る。」",
+          ],
+        },
+        {
           id: "grassland-warden",
           kind: "boss",
           name: "ゴブリン親分",
@@ -928,6 +1017,14 @@
           x: 4,
           y: 15,
           contents: { equipment: "wisdomRing" },
+        },
+        {
+          id: "forest-hidden-cache",
+          kind: "chest",
+          name: "隠し宝箱",
+          x: 21,
+          y: 13,
+          contents: { items: { wakeFlower: 1, herb: 1 }, gold: 26 },
         },
       ],
     },
@@ -1085,6 +1182,28 @@
           y: 12,
           contents: { items: { magicWater: 1 }, equipment: "leatherArmor", gold: 32 },
         },
+        {
+          id: "mountain-breakable-rock",
+          kind: "breakableRock",
+          name: "ひび割れた岩",
+          x: 10,
+          y: 12,
+          flag: "brokenRoadRock",
+          hiddenWhenFlags: ["brokenRoadRock"],
+          messages: [
+            "ひび割れた岩が道を塞いでいる。",
+            "何度か強く押すと、岩は崩れて脇へ転がった。",
+          ],
+        },
+        {
+          id: "mountain-hidden-cache",
+          kind: "chest",
+          name: "隠し宝箱",
+          x: 11,
+          y: 12,
+          requiredFlags: ["brokenRoadRock"],
+          contents: { items: { hiHerb: 1, sparkHerb: 1 }, equipment: "swiftBracelet" },
+        },
       ],
     },
     cave: {
@@ -1161,7 +1280,7 @@
       tiles: [
         "R".repeat(24),
         "R" + "B".repeat(22) + "R",
-        "R" + "B".repeat(5) + "R".repeat(4) + "B".repeat(13) + "R",
+        "R" + "B".repeat(5) + "H".repeat(4) + "B".repeat(13) + "R",
         "R" + "B".repeat(22) + "R",
         "R" + "B".repeat(8) + "R".repeat(2) + "B".repeat(12) + "R",
         "R" + "B".repeat(22) + "R",
@@ -1237,6 +1356,16 @@
           x: 3,
           y: 3,
           contents: { equipment: "magicRobe", items: { magicWater: 1 } },
+        },
+        {
+          id: "cave-secret-note",
+          kind: "inspect",
+          name: "違和感のある壁",
+          x: 8,
+          y: 2,
+          messages: [
+            "壁の色が少し違う。指で押すと、奥へ抜ける細い通路があると分かった。",
+          ],
         },
       ],
     },
@@ -1471,6 +1600,7 @@
       color: "#6a8bd6",
       sprite: "spirit",
       resistances: ["fire"],
+      statusAttack: { type: "sleep", chance: 0.16, turns: 2, message: "青白い火にまぶたが重くなった。" },
     },
     leafImp: {
       name: "リーフインプ",
@@ -1499,6 +1629,7 @@
       color: "#5d5170",
       sprite: "wasp",
       weaknesses: ["fire"],
+      statusAttack: { type: "paralysis", chance: 0.13, turns: 2, message: "超音波で体がしびれた。" },
     },
     wildBoar: {
       name: "あばれイノシシ",
@@ -1569,6 +1700,7 @@
       sprite: "wasp",
       weaknesses: ["fire"],
       resistances: ["thunder"],
+      statusAttack: { type: "paralysis", chance: 0.16, turns: 2, message: "岩粉が関節にまとわりついた。" },
     },
     stoneSlime: {
       name: "いしスライム",
@@ -1630,6 +1762,14 @@
       boss: true,
       weaknesses: ["fire"],
       bossAi: "forestWarden",
+      phaseTwo: {
+        threshold: 0.5,
+        name: "森の番人・怒れる根",
+        color: "#2f8f54",
+        attackBonus: 10,
+        defenseBonus: 6,
+        message: "森の番人の根が赤く脈打つ。第二形態に移行した！",
+      },
     },
     caveWarden: {
       name: "岩窟の暴君",
@@ -1646,6 +1786,14 @@
       boss: true,
       resistances: ["fire"],
       bossAi: "caveWarden",
+      phaseTwo: {
+        threshold: 0.5,
+        name: "岩窟の暴君・砕岩形態",
+        color: "#8a7282",
+        attackBonus: 14,
+        defenseBonus: 8,
+        message: "岩窟の暴君の外殻が砕け、むき出しの魔力が噴き出した！",
+      },
     },
   };
   const ENEMIES = ["slime", "wolf", "wasp", "spirit"].map((enemyId) => ENEMY_TEMPLATES[enemyId]);
@@ -1726,6 +1874,9 @@
         gold: 0,
         status: {
           poison: false,
+          sleep: 0,
+          paralysis: 0,
+          burn: 0,
         },
         equipment: {
           attack: 0,
@@ -1750,7 +1901,11 @@
       defeatedBosses: {},
       story: createStoryState(),
       log: ["町の南から草原へ向かえる。"],
+      battleLog: [],
       steps: 0,
+      settings: {
+        questBadgeVisible: true,
+      },
       tutorial: {
         done: false,
         active: false,
@@ -1809,11 +1964,27 @@
       });
 
       map.entities.forEach((entity) => {
-        if (!isWalkableOnMap(mapId, entity.x, entity.y) && !["door", "shop", "inn", "obstacle"].includes(entity.kind)) {
-          errors.push(`${mapId}:${entity.id} is placed on a blocked tile.`);
-        }
+        const positions = [
+          { x: entity.x, y: entity.y },
+          ...Object.values(entity.timePositions || {}),
+        ];
+        positions.forEach((position) => {
+          if (!isWalkableOnMap(mapId, position.x, position.y) && !["door", "shop", "inn", "obstacle"].includes(entity.kind)) {
+            errors.push(`${mapId}:${entity.id} is placed on a blocked tile.`);
+          }
+        });
         if (entity.kind === "boss" && !ENEMY_TEMPLATES[entity.enemyId]) {
           errors.push(`${mapId}:${entity.id} references missing enemy ${entity.enemyId}.`);
+        }
+        if (entity.kind === "breakableRock" && !entity.flag) {
+          errors.push(`${mapId}:${entity.id} breakable rock must set a flag.`);
+        }
+        if (entity.kind === "inspect") {
+          Object.keys(entity.onceItems || {}).forEach((itemId) => {
+            if (!TOOL_ITEMS[itemId]) {
+              errors.push(`${mapId}:${entity.id} grants missing tool ${itemId}.`);
+            }
+          });
         }
         if (entity.kind === "chest") {
           const contents = entity.contents || {};
@@ -1890,6 +2061,26 @@
         }
       });
     });
+    Object.entries(BATTLE_ACTION_DETAILS).forEach(([actionId, action]) => {
+      if (action.category === "item" && !TOOL_ITEMS[actionId]) {
+        errors.push(`Battle item action ${actionId} has no matching tool item.`);
+      }
+    });
+    EQUIPMENT_SET_BONUSES.forEach((bonus) => {
+      bonus.items.forEach((itemId) => {
+        if (!EQUIPMENT_ITEMS[itemId]) {
+          errors.push(`Equipment set ${bonus.id} references missing equipment ${itemId}.`);
+        }
+      });
+    });
+    if (!TILES.H?.walkable) {
+      errors.push("Hidden passage tile H must be walkable.");
+    }
+    ["questToggleButton", "menuQuestToggleButton", "statusIcons", "mobileStatusIcons", "touchStatusIcons"].forEach((uiKey) => {
+      if (!ui[uiKey]) {
+        errors.push(`Missing UI element ${uiKey}.`);
+      }
+    });
 
     return {
       ok: errors.length === 0,
@@ -1919,6 +2110,21 @@
     state.story.visitedMaps = { town: true, ...(state.story.visitedMaps || {}) };
     state.story.chapter = Number.isFinite(state.story.chapter) ? state.story.chapter : 1;
     return state.story;
+  }
+
+  function ensureSettings() {
+    if (!state.settings) {
+      state.settings = {};
+    }
+    state.settings.questBadgeVisible = state.settings.questBadgeVisible !== false;
+    return state.settings;
+  }
+
+  function toggleQuestBadge() {
+    const settings = ensureSettings();
+    settings.questBadgeVisible = !settings.questBadgeVisible;
+    playItemSound();
+    renderHud();
   }
 
   function getFlag(flagId) {
@@ -2032,8 +2238,23 @@
     return TILES[tile].walkable && !entity;
   }
 
+  function timeOfDay() {
+    return Math.floor((Number(state.steps) || 0) / 64) % 2 === 0 ? "day" : "night";
+  }
+
+  function entityPosition(entity) {
+    const timedPosition = entity.timePositions?.[timeOfDay()];
+    return {
+      x: Number.isFinite(timedPosition?.x) ? timedPosition.x : entity.x,
+      y: Number.isFinite(timedPosition?.y) ? timedPosition.y : entity.y,
+    };
+  }
+
   function getEntityAt(x, y) {
-    return currentMap().entities.find((entity) => entity.x === x && entity.y === y && !isEntityGone(entity));
+    return currentMap().entities.find((entity) => {
+      const position = entityPosition(entity);
+      return position.x === x && position.y === y && !isEntityGone(entity);
+    });
   }
 
   function getAdjacentEntity() {
@@ -2042,7 +2263,8 @@
         return false;
       }
 
-      const distance = Math.abs(entity.x - state.player.x) + Math.abs(entity.y - state.player.y);
+      const position = entityPosition(entity);
+      const distance = Math.abs(position.x - state.player.x) + Math.abs(position.y - state.player.y);
       return distance === 1 || distance === 0;
     });
   }
@@ -2076,6 +2298,13 @@
     battleMessage = text;
     state.log.unshift(text);
     state.log = state.log.slice(0, 8);
+    if (state.mode === "battle") {
+      if (!Array.isArray(state.battleLog)) {
+        state.battleLog = [];
+      }
+      state.battleLog.unshift(text);
+      state.battleLog = state.battleLog.slice(0, 4);
+    }
     renderHud();
     draw();
   }
@@ -2529,6 +2758,12 @@
     if (item.effect?.type === "curePoison") {
       return hasStatus("poison");
     }
+    if (item.effect?.type === "cureSleep") {
+      return hasStatus("sleep");
+    }
+    if (item.effect?.type === "cureParalysis") {
+      return hasStatus("paralysis");
+    }
     return false;
   }
 
@@ -2568,6 +2803,24 @@
       setPlayerStatus("poison", false);
       return {
         message: `${item.name}を使った。毒が消えた。`,
+        effectType: "item",
+        amount: 0,
+      };
+    }
+
+    if (effect.type === "cureSleep") {
+      setPlayerStatus("sleep", false);
+      return {
+        message: `${item.name}を使った。眠気が晴れた。`,
+        effectType: "item",
+        amount: 0,
+      };
+    }
+
+    if (effect.type === "cureParalysis") {
+      setPlayerStatus("paralysis", false);
+      return {
+        message: `${item.name}を使った。しびれが消えた。`,
         effectType: "item",
         amount: 0,
       };
@@ -2690,7 +2943,19 @@
         stats[stat] += Number(item[stat]) || 0;
       });
     });
+    activeSetBonuses(gear).forEach((bonus) => {
+      Object.entries(bonus.stats || {}).forEach(([stat, value]) => {
+        if (Object.prototype.hasOwnProperty.call(stats, stat)) {
+          stats[stat] += Number(value) || 0;
+        }
+      });
+    });
     return stats;
+  }
+
+  function activeSetBonuses(gear = ensureGear()) {
+    const equippedItems = new Set(Object.values(gear).filter(Boolean));
+    return EQUIPMENT_SET_BONUSES.filter((bonus) => bonus.items.every((itemId) => equippedItems.has(itemId)));
   }
 
   function syncEquipmentStats(player = state.player) {
@@ -2740,11 +3005,54 @@
   }
 
   function criticalRate(entity) {
-    return clamp(0.025 + effectiveStat(entity, "dexterity") / 1000, 0.025, 0.07);
+    const accessory = entity === state.player ? EQUIPMENT_ITEMS[ensureGear().accessory] : null;
+    const accessoryBonus = Number(accessory?.criticalBonus) || 0;
+    return clamp(0.025 + effectiveStat(entity, "dexterity") / 1000 + accessoryBonus, 0.025, 0.07);
+  }
+
+  function equippedItem(slot, entity = state.player) {
+    if (entity !== state.player) {
+      return null;
+    }
+    return EQUIPMENT_ITEMS[ensureGear(entity)[slot]] || null;
+  }
+
+  function weaponElement(entity) {
+    return equippedItem("weapon", entity)?.element || "none";
+  }
+
+  function evasionRate(entity) {
+    const accessory = entity === state.player ? EQUIPMENT_ITEMS[ensureGear().accessory] : null;
+    const accessoryBonus = Number(accessory?.evasionBonus) || 0;
+    return clamp(0.03 + effectiveStat(entity, "agility") / 1500 + accessoryBonus, 0.03, 0.18);
+  }
+
+  function accuracyRate(attacker, defender) {
+    const accuracyBase = 0.9 + (effectiveStat(attacker, "dexterity") - effectiveStat(defender, "agility")) / 620;
+    return clamp(accuracyBase - evasionRate(defender), 0.72, 0.97);
+  }
+
+  function elementResult(defender, element = "none") {
+    if (!element || element === "none") {
+      return { factor: 1, text: "", isWeak: false, isResisted: false };
+    }
+
+    const isWeak = defender.weaknesses?.includes(element);
+    const isResisted = defender.resistances?.includes(element);
+    return {
+      factor: isWeak ? 1.45 : isResisted ? 0.65 : 1,
+      text: isWeak ? "弱点を突いた！" : isResisted ? "あまり効いていない。" : "",
+      isWeak,
+      isResisted,
+    };
   }
 
   function calculatePhysicalDamage(attacker, defender, options = {}) {
     const attackMultiplier = options.attackMultiplier || 1;
+    if (Math.random() > accuracyRate(attacker, defender)) {
+      return { damage: 0, isCritical: false, missed: true, elementText: "", isWeak: false, isResisted: false };
+    }
+
     const attackScore = Math.floor((effectiveStat(attacker, "attack") * attackMultiplier) / 2);
     const defenseScore = Math.floor(effectiveStat(defender, "defense") / 4);
     const baseDamage = Math.max(1, attackScore - defenseScore);
@@ -2753,12 +3061,20 @@
     const variance = randomInt(94, 106) / 100;
     const isCritical = Math.random() < criticalRate(attacker);
     const criticalFactor = isCritical ? 1.8 : 1;
+    const elementInfo = elementResult(defender, options.element || weaponElement(attacker));
     const damage = Math.max(
       1,
-      Math.floor(((baseDamage * dexterityFactor * equipmentFactor * variance * criticalFactor) / 4) + 1),
+      Math.floor(((baseDamage * dexterityFactor * equipmentFactor * variance * criticalFactor * elementInfo.factor) / 4) + 1),
     );
 
-    return { damage, isCritical };
+    return {
+      damage,
+      isCritical,
+      missed: false,
+      elementText: elementInfo.text,
+      isWeak: elementInfo.isWeak,
+      isResisted: elementInfo.isResisted,
+    };
   }
 
   function calculateMagicHeal(caster, multiplier = 1) {
@@ -2778,14 +3094,13 @@
     const dexterityFactor = dexterityModifier(caster);
     const equipmentFactor = equipmentModifier(caster, "wisdom");
     const variance = randomInt(94, 108) / 100;
-    const element = action.element || "none";
-    const weak = defender.weaknesses?.includes(element);
-    const resisted = defender.resistances?.includes(element);
-    const elementFactor = weak ? 1.45 : resisted ? 0.65 : 1;
-    const damage = Math.max(1, Math.floor(((baseDamage * dexterityFactor * equipmentFactor * variance * elementFactor) / 3) + 1));
+    const elementInfo = elementResult(defender, action.element || "none");
+    const damage = Math.max(1, Math.floor(((baseDamage * dexterityFactor * equipmentFactor * variance * elementInfo.factor) / 3) + 1));
     return {
       damage,
-      elementText: weak ? "弱点を突いた！" : resisted ? "あまり効いていない。" : "",
+      elementText: elementInfo.text,
+      isWeak: elementInfo.isWeak,
+      isResisted: elementInfo.isResisted,
     };
   }
 
@@ -2840,20 +3155,32 @@
       player.status = {};
     }
     player.status.poison = Boolean(player.status.poison);
+    player.status.sleep = Math.max(0, Math.floor(Number(player.status.sleep) || 0));
+    player.status.paralysis = Math.max(0, Math.floor(Number(player.status.paralysis) || 0));
+    player.status.burn = Math.max(0, Math.floor(Number(player.status.burn) || 0));
     return player.status;
   }
 
   function hasStatus(statusId, player = state.player) {
-    return Boolean(normalizePlayerStatus(player)[statusId]);
+    const value = normalizePlayerStatus(player)[statusId];
+    return typeof value === "number" ? value > 0 : Boolean(value);
   }
 
-  function setPlayerStatus(statusId, value) {
+  function setPlayerStatus(statusId, value, turns = 0) {
     normalizePlayerStatus();
-    state.player.status[statusId] = Boolean(value);
+    if (statusId === "poison") {
+      state.player.status.poison = Boolean(value);
+      return;
+    }
+
+    state.player.status[statusId] = value ? Math.max(1, Math.floor(Number(turns) || 2)) : 0;
   }
 
   function clearNegativeStatuses() {
     setPlayerStatus("poison", false);
+    setPlayerStatus("sleep", false);
+    setPlayerStatus("paralysis", false);
+    setPlayerStatus("burn", false);
   }
 
   function statusSummary(player = state.player) {
@@ -2862,7 +3189,52 @@
     if (status.poison) {
       labels.push("毒");
     }
+    if (status.sleep > 0) {
+      labels.push(`眠り${status.sleep}`);
+    }
+    if (status.paralysis > 0) {
+      labels.push(`麻痺${status.paralysis}`);
+    }
+    if (status.burn > 0) {
+      labels.push(`火傷${status.burn}`);
+    }
     return labels.length ? labels.join("・") : "正常";
+  }
+
+  function statusIconEntries(player = state.player) {
+    const status = normalizePlayerStatus(player);
+    const entries = [];
+    if (status.poison) {
+      entries.push({ id: "poison", label: "毒" });
+    }
+    if (status.sleep > 0) {
+      entries.push({ id: "sleep", label: `眠${status.sleep}` });
+    }
+    if (status.paralysis > 0) {
+      entries.push({ id: "paralysis", label: `痺${status.paralysis}` });
+    }
+    if (status.burn > 0) {
+      entries.push({ id: "burn", label: `炎${status.burn}` });
+    }
+    return entries;
+  }
+
+  function statusShortLabel(statusId) {
+    return {
+      poison: "毒",
+      sleep: "眠",
+      paralysis: "痺",
+      burn: "炎",
+    }[statusId] || "異";
+  }
+
+  function statusEffectColor(statusId) {
+    return {
+      poison: "#7f4a8f",
+      sleep: "#4a76c6",
+      paralysis: "#d1a737",
+      burn: "#e05a48",
+    }[statusId] || "#fffaf1";
   }
 
   function equipmentSlotLabel(slot) {
@@ -2875,9 +3247,11 @@
 
   function equipmentSummary(player = state.player) {
     const gear = ensureGear(player);
-    return ["weapon", "armor", "accessory"]
+    const baseSummary = ["weapon", "armor", "accessory"]
       .map((slot) => `${equipmentSlotLabel(slot)}: ${EQUIPMENT_ITEMS[gear[slot]]?.name || "なし"}`)
       .join(" / ");
+    const setNames = activeSetBonuses(gear).map((bonus) => bonus.name);
+    return setNames.length ? `${baseSummary} / セット: ${setNames.join("・")}` : baseSummary;
   }
 
   function equipItem(itemId) {
@@ -3181,6 +3555,16 @@
       return;
     }
 
+    if (entity.kind === "inspect") {
+      await inspectObject(entity);
+      return;
+    }
+
+    if (entity.kind === "breakableRock") {
+      await breakRock(entity);
+      return;
+    }
+
     if (entity.kind === "lever") {
       await pullLever(entity);
       return;
@@ -3237,15 +3621,15 @@
     const pack = getFlag("eastRoadOpened")
       ? {
         name: "岩山支度セット",
-        price: 55,
-        items: { hiHerb: 1, magicWater: 1, antidote: 1 },
-        description: "上薬草、魔法の水、毒消し草",
+        price: 68,
+        items: { hiHerb: 1, magicWater: 1, antidote: 1, sparkHerb: 1 },
+        description: "上薬草、魔法の水、毒消し草、しびれ消し草",
       }
       : {
         name: "旅支度セット",
-        price: 22,
-        items: { herb: 2, antidote: 1 },
-        description: "薬草2個、毒消し草1個",
+        price: 30,
+        items: { herb: 2, antidote: 1, wakeFlower: 1 },
+        description: "薬草2個、毒消し草1個、目覚めの花1個",
       };
     const willBuy = await ask("道具屋", `${pack.name}は${pack.price}Gだよ。中身は${pack.description}。買っていくかい？`);
     if (!willBuy) {
@@ -3321,13 +3705,29 @@
       await say(splitMessage.speaker, splitMessage.text);
     }
 
+    await playBossEncounterSequence(entity);
     startBattle(enemyTemplateById(entity.enemyId), {
       bossId: entity.id,
       victorySpeaker: entity.name,
       victoryMessage: entity.victoryMessage,
       setFlags: entity.setFlags,
       grantKeyItems: entity.grantKeyItems,
+      introPlayed: true,
     });
+  }
+
+  async function playBossEncounterSequence(entity) {
+    controlsLocked = true;
+    ui.fieldFade.hidden = false;
+    playBossStartSound();
+    await wait(40);
+    ui.fieldFade.classList.add("visible");
+    await wait(520);
+    await say(entity.name, "強大な気配が周囲を包み込む……。");
+    ui.fieldFade.classList.remove("visible");
+    await wait(420);
+    ui.fieldFade.hidden = true;
+    controlsLocked = false;
   }
 
   async function stayAtInn() {
@@ -3383,6 +3783,38 @@
     await say(entity.name, entity.message || "体力が回復した。");
   }
 
+  async function inspectObject(entity) {
+    for (const message of entity.messages || ["じっくり調べたが、特に変わったところはない。"]) {
+      await say(entity.name, message);
+    }
+
+    if (entity.onceId && !state.openedChests[entity.onceId]) {
+      Object.entries(entity.onceItems || {}).forEach(([itemId, amount]) => addToolItem(itemId, amount));
+      state.openedChests[entity.onceId] = true;
+      playItemSound();
+      render();
+    }
+  }
+
+  async function breakRock(entity) {
+    if (getFlag(entity.flag)) {
+      await say(entity.name, "岩は崩れていて、もう道を塞いでいない。");
+      return;
+    }
+
+    const willBreak = await ask(entity.name, entity.messages?.[0] || "ひび割れた岩がある。押してみますか？");
+    if (!willBreak) {
+      await say(entity.name, "今はそのままにしておいた。");
+      return;
+    }
+
+    setFlag(entity.flag, true);
+    playRockBreakSound();
+    await playEffect({ type: "statusBurst", label: "BREAK", color: "#d7ba7a" }, EFFECT_DURATIONS.statusBurst);
+    render();
+    await say(entity.name, entity.messages?.[1] || "岩が崩れ、道が開いた。");
+  }
+
   async function openChest(chest) {
     if (isChestOpen(chest)) {
       await say("宝箱", "宝箱は空っぽだ。");
@@ -3405,7 +3837,7 @@
     state.player.gold += gold;
     state.openedChests[chest.id] = true;
     applyFlagChanges(contents.setFlags);
-    playItemSound();
+    playChestSound();
 
     const rewards = [];
     Object.entries(itemRewards).forEach(([itemId, amount]) => {
@@ -3446,6 +3878,7 @@
     };
 
     state.mode = "battle";
+    state.battleLog = [];
     state.battle = {
       enemy,
       busy: false,
@@ -3464,7 +3897,11 @@
     setBattleMessage(`${enemy.name}が現れた。`);
     updateBgm();
     if (enemy.boss) {
-      playBossStartSound();
+      if (!options.introPlayed) {
+        playBossStartSound();
+      }
+    } else {
+      playBattleStartSound();
     }
     render();
     focusBattleView();
@@ -3626,9 +4063,21 @@
       return Object.keys(TOOL_ITEMS)
         .filter((itemId) => BATTLE_ACTION_DETAILS[itemId] && itemCount(itemId) > 0)
         .sort((a, b) => {
+          const usableDifference = Number(canUseToolItem(b)) - Number(canUseToolItem(a));
+          if (usableDifference !== 0) {
+            return usableDifference;
+          }
           if (hasStatus("poison")) {
             if (a === "antidote") return -1;
             if (b === "antidote") return 1;
+          }
+          if (hasStatus("sleep")) {
+            if (a === "wakeFlower") return -1;
+            if (b === "wakeFlower") return 1;
+          }
+          if (hasStatus("paralysis")) {
+            if (a === "sparkHerb") return -1;
+            if (b === "sparkHerb") return 1;
           }
           return 0;
         })
@@ -3809,6 +4258,19 @@
         }
       }
 
+      const playerSkipped = await maybeSkipPlayerAction();
+      if (playerSkipped) {
+        if (playerFirst) {
+          await wait(BATTLE_TURN_PAUSE);
+          await enemyTurn();
+        }
+
+        if (state.mode === "battle" && state.battle) {
+          await applyPlayerStatusEndTurn();
+        }
+        return;
+      }
+
       await action();
 
       if (state.mode !== "battle" || !state.battle) {
@@ -3821,7 +4283,7 @@
       }
 
       if (state.mode === "battle" && state.battle) {
-        await applyPoisonEndTurn();
+        await applyPlayerStatusEndTurn();
       }
     } finally {
       if (state.mode === "battle" && state.battle) {
@@ -3834,17 +4296,53 @@
     }
   }
 
-  async function applyPoisonEndTurn() {
-    if (!hasStatus("poison")) {
-      return;
+  async function maybeSkipPlayerAction() {
+    const status = normalizePlayerStatus();
+    if (status.sleep > 0) {
+      addLog("眠っていて動けない。");
+      await wait(BATTLE_TURN_PAUSE);
+      return true;
     }
 
-    const damage = Math.max(1, Math.floor(state.player.maxHp / 16));
-    state.player.hp = clamp(state.player.hp - damage, 0, state.player.maxHp);
-    addLog(`毒が体をむしばむ。${damage}ダメージ。`);
-    await wait(BATTLE_TURN_PAUSE);
-    if (state.player.hp <= 0) {
-      handlePlayerDefeat();
+    if (status.paralysis > 0 && Math.random() < 0.45) {
+      addLog("体がしびれて動けない。");
+      await wait(BATTLE_TURN_PAUSE);
+      return true;
+    }
+
+    return false;
+  }
+
+  async function applyPlayerStatusEndTurn() {
+    const status = normalizePlayerStatus();
+    const messages = [];
+
+    if (status.poison) {
+      const damage = Math.max(1, Math.floor(state.player.maxHp / 16));
+      state.player.hp = clamp(state.player.hp - damage, 0, state.player.maxHp);
+      messages.push({ text: `毒が体をむしばむ。${damage}ダメージ。`, label: "毒", color: statusEffectColor("poison") });
+    }
+
+    if (status.burn > 0) {
+      const damage = Math.max(1, Math.floor(state.player.maxHp / 18));
+      state.player.hp = clamp(state.player.hp - damage, 0, state.player.maxHp);
+      messages.push({ text: `火傷がひりつく。${damage}ダメージ。`, label: "炎", color: statusEffectColor("burn") });
+    }
+
+    ["sleep", "paralysis", "burn"].forEach((statusId) => {
+      if (status[statusId] > 0) {
+        status[statusId] = Math.max(0, status[statusId] - 1);
+      }
+    });
+
+    for (const message of messages) {
+      addLog(message.text);
+      playStatusSound();
+      await playEffect({ type: "statusDamage", label: message.label, color: message.color }, EFFECT_DURATIONS.statusDamage);
+      if (state.player.hp <= 0) {
+        handlePlayerDefeat();
+        return;
+      }
     }
   }
 
@@ -3863,14 +4361,23 @@
 
     battleCommandView = "root";
     setBattleBusy(true);
-    state.battle.playerDefending = true;
 
     try {
+      const playerSkipped = await maybeSkipPlayerAction();
+      if (playerSkipped) {
+        await enemyTurn();
+        if (state.mode === "battle" && state.battle) {
+          await applyPlayerStatusEndTurn();
+        }
+        return;
+      }
+
+      state.battle.playerDefending = true;
       addLog("身を守っている。受けるダメージを減らす。");
       await wait(BATTLE_TURN_PAUSE);
       await enemyTurn();
       if (state.mode === "battle" && state.battle) {
-        await applyPoisonEndTurn();
+        await applyPlayerStatusEndTurn();
       }
     } finally {
       if (state.mode === "battle" && state.battle) {
@@ -3929,17 +4436,36 @@
     const enemy = state.battle.enemy;
     let result = calculatePhysicalDamage(state.player, enemy, { attackMultiplier });
     if (isTutorialBattle() && actionType === "attack") {
-      result = { damage: Math.min(6, Math.max(1, enemy.hp - 8)), isCritical: false };
+      result = { damage: Math.min(6, Math.max(1, enemy.hp - 8)), isCritical: false, missed: false, elementText: "" };
     } else if (isTutorialBattle() && actionType === "skill") {
-      result = { damage: enemy.hp, isCritical: false };
+      result = { damage: enemy.hp, isCritical: false, missed: false, elementText: "" };
     }
 
-    playSlashSound();
-    await playEffect({ type: "slash", damage: result.damage }, EFFECT_DURATIONS.slash);
+    if (result.missed) {
+      playMissSound();
+      await playEffect({ type: "statusBurst", label: "MISS", color: "#d8d1c3" }, EFFECT_DURATIONS.statusBurst);
+      addLog(`${label}。しかし攻撃は外れた。`);
+      render();
+      return;
+    }
+
+    if (result.isCritical) {
+      playCriticalSound();
+    } else {
+      playSlashSound();
+    }
+    await playEffect(
+      { type: result.isCritical ? "criticalSlash" : "slash", damage: result.damage },
+      result.isCritical ? EFFECT_DURATIONS.criticalSlash : EFFECT_DURATIONS.slash,
+    );
+    if (result.isWeak) {
+      playWeaknessSound();
+      await playEffect({ type: "weakness", label: "WEAK" }, EFFECT_DURATIONS.weakness);
+    }
 
     enemy.hp = clamp(enemy.hp - result.damage, 0, enemy.maxHp);
     const criticalText = result.isCritical ? "会心の一撃！" : "";
-    addLog(`${label}。${criticalText}${enemy.name}に${result.damage}ダメージ。`);
+    addLog(`${label}。${criticalText}${result.elementText}${enemy.name}に${result.damage}ダメージ。`);
 
     if (enemy.hp <= 0) {
       playDefeatSound();
@@ -3948,6 +4474,7 @@
       return;
     }
 
+    await maybeTriggerBossPhase(enemy);
     render();
   }
 
@@ -4007,6 +4534,10 @@
       const result = calculateMagicDamage(state.player, enemy, action);
       playMagicSound();
       await playEffect({ type: "magicAttack", damage: result.damage }, EFFECT_DURATIONS.magicAttack);
+      if (result.isWeak) {
+        playWeaknessSound();
+        await playEffect({ type: "weakness", label: "WEAK" }, EFFECT_DURATIONS.weakness);
+      }
 
       enemy.hp = clamp(enemy.hp - result.damage, 0, enemy.maxHp);
       addLog(`${action.name}を唱えた。${result.elementText}${enemy.name}に${result.damage}ダメージ。`);
@@ -4018,6 +4549,7 @@
         return;
       }
 
+      await maybeTriggerBossPhase(enemy);
       render();
     }, "magic");
   }
@@ -4051,7 +4583,7 @@
       if (result?.effectType === "heal") {
         await playEffect({ type: "heal", amount: result.amount }, EFFECT_DURATIONS.heal);
       } else {
-        await wait(BATTLE_TURN_PAUSE);
+        await playEffect({ type: "statusBurst", label: "ITEM", color: "#8eb0d6" }, EFFECT_DURATIONS.item);
       }
     }, "item");
   }
@@ -4120,6 +4652,15 @@
       return { chargeMessage: `${enemy.name}は大きく枝を広げ、力をためている……。` };
     }
 
+    if (enemy.bossAi === "forestWarden" && battle.phaseTwoTriggered && Math.random() < 0.28) {
+      return {
+        label: "眠りの花粉",
+        attackMultiplier: 0.75,
+        message: `${enemy.name}が眠りの花粉を散らした！`,
+        statusAttack: { type: "sleep", chance: 0.42, turns: 2, message: "甘い香りで意識が遠のく。" },
+      };
+    }
+
     if (enemy.bossAi === "caveWarden" && battle.enemyTurnCount % 4 === 0) {
       battle.enemyIntent = {
         label: "岩砕き",
@@ -4127,6 +4668,16 @@
         message: `${enemy.name}の岩砕きが襲いかかった！`,
       };
       return { chargeMessage: `${enemy.name}の周囲に岩の魔力が集まっている……。` };
+    }
+
+    if (enemy.bossAi === "caveWarden" && battle.phaseTwoTriggered && battle.enemyTurnCount % 3 === 0) {
+      battle.enemyIntent = {
+        label: "熱岩弾",
+        attackMultiplier: 1.55,
+        message: `${enemy.name}が熱を帯びた岩を投げつけた！`,
+        statusAttack: { type: "burn", chance: 0.36, turns: 3, message: "熱岩の破片が肌を焼いた。" },
+      };
+      return { chargeMessage: `${enemy.name}の砕けた外殻が赤く熱を帯びる……。` };
     }
 
     if (enemy.bossAi === "caveWarden" && hpRatio <= 0.55 && Math.random() < 0.25) {
@@ -4154,14 +4705,37 @@
     };
   }
 
+  async function maybeTriggerBossPhase(enemy) {
+    const battle = state.battle;
+    const phase = enemy.phaseTwo;
+    if (!battle || !enemy.boss || !phase || battle.phaseTwoTriggered || enemy.hp <= 0) {
+      return false;
+    }
+
+    if (enemy.hp / enemy.maxHp > (phase.threshold || 0.5)) {
+      return false;
+    }
+
+    battle.phaseTwoTriggered = true;
+    enemy.name = phase.name || enemy.name;
+    enemy.color = phase.color || enemy.color;
+    enemy.attack += Number(phase.attackBonus) || 0;
+    enemy.defense += Number(phase.defenseBonus) || 0;
+    addLog(phase.message || `${enemy.name}の様子が変わった！`);
+    playBossPhaseSound();
+    await playEffect({ type: "bossIntro", label: "PHASE 2" }, EFFECT_DURATIONS.bossIntro);
+    return true;
+  }
+
   function maybeApplyEnemyStatus(action) {
     const statusAttack = action.statusAttack;
     if (!statusAttack || hasStatus(statusAttack.type)) {
       return "";
     }
 
-    const poisonResist = Number(ensureGear() && EQUIPMENT_ITEMS[ensureGear().accessory]?.poisonResist) || 0;
-    const chance = clamp((Number(statusAttack.chance) || 0) - poisonResist * 0.18, 0.03, 0.85);
+    const accessory = EQUIPMENT_ITEMS[ensureGear().accessory] || {};
+    const resist = Number(accessory[`${statusAttack.type}Resist`]) || Number(statusAttack.type === "poison" ? accessory.poisonResist : 0) || 0;
+    const chance = clamp((Number(statusAttack.chance) || 0) - resist * 0.18, 0.03, 0.85);
     if (Math.random() >= chance) {
       return "";
     }
@@ -4169,6 +4743,21 @@
     if (statusAttack.type === "poison") {
       setPlayerStatus("poison", true);
       return `${statusAttack.message || "毒を受けた。"} 毒状態になった。`;
+    }
+
+    if (statusAttack.type === "sleep") {
+      setPlayerStatus("sleep", true, statusAttack.turns || 2);
+      return `${statusAttack.message || "眠気に包まれた。"} 眠ってしまった。`;
+    }
+
+    if (statusAttack.type === "paralysis") {
+      setPlayerStatus("paralysis", true, statusAttack.turns || 2);
+      return `${statusAttack.message || "体がしびれた。"} 麻痺してしまった。`;
+    }
+
+    if (statusAttack.type === "burn") {
+      setPlayerStatus("burn", true, statusAttack.turns || 3);
+      return `${statusAttack.message || "熱に焼かれた。"} 火傷を負った。`;
     }
 
     return "";
@@ -4200,6 +4789,14 @@
       result = { ...result, damage: Math.max(1, Math.floor(result.damage * 0.42)) };
     }
 
+    if (result.missed) {
+      playMissSound();
+      await playEffect({ type: "statusBurst", label: "MISS", color: "#d8d1c3" }, EFFECT_DURATIONS.statusBurst);
+      addLog(`${action.message || `${enemy.name}の攻撃。`}しかし攻撃は外れた。`);
+      render();
+      return;
+    }
+
     playHitSound();
     await playEffect({ type: "enemyAttack", damage: result.damage }, EFFECT_DURATIONS.enemyAttack);
 
@@ -4208,6 +4805,13 @@
     const defendText = state.battle.playerDefending ? "身を守ってダメージを抑えた。" : "";
     const statusText = maybeApplyEnemyStatus(action);
     addLog(`${action.message || `${enemy.name}の攻撃。`}${criticalText}${result.damage}ダメージ。${defendText}${statusText}`);
+    if (statusText) {
+      playStatusSound();
+      await playEffect(
+        { type: "statusBurst", label: statusShortLabel(action.statusAttack?.type), color: statusEffectColor(action.statusAttack?.type) },
+        EFFECT_DURATIONS.statusBurst,
+      );
+    }
 
     if (state.player.hp <= 0) {
       await wait(BATTLE_TURN_PAUSE);
@@ -4231,6 +4835,7 @@
     pendingBattleAction = null;
     state.player.gold += enemy.gold;
     setBattleMessage("たたかいに勝った！");
+    playVictorySound();
     await say("戦闘結果", "たたかいに勝った！");
     await say("戦闘結果", `${enemy.exp}の経験値を獲得！`);
 
@@ -4259,10 +4864,12 @@
       applyFlagChanges(battleMeta.setFlags);
       battleMeta.grantKeyItems.forEach((itemId) => giveKeyItem(itemId));
       playBossDefeatSound();
+      await playEffect({ type: "bossDefeat", label: "BOSS DOWN" }, EFFECT_DURATIONS.bossDefeat);
     }
 
     state.mode = "explore";
     state.battle = null;
+    state.battleLog = [];
     battleCommandView = "root";
     updateBgm();
     render();
@@ -4681,9 +5288,38 @@
     playTone(784, 0.16, 0.12, "triangle", 0.075);
   }
 
+  function playBattleStartSound() {
+    playTone(220, 0, 0.08, "square", 0.07);
+    playTone(330, 0.08, 0.08, "square", 0.07);
+    playTone(165, 0.18, 0.16, "sawtooth", 0.055);
+  }
+
+  function playVictorySound() {
+    playTone(523, 0, 0.12, "square", 0.07);
+    playTone(659, 0.11, 0.12, "square", 0.07);
+    playTone(784, 0.22, 0.16, "square", 0.075);
+    playTone(1046, 0.4, 0.24, "triangle", 0.07);
+  }
+
   function playSlashSound() {
     playTone(880, 0, 0.08, "square", 0.08);
     playTone(360, 0.045, 0.11, "sawtooth", 0.05);
+  }
+
+  function playCriticalSound() {
+    playTone(1200, 0, 0.08, "square", 0.09);
+    playTone(920, 0.06, 0.08, "square", 0.085);
+    playTone(220, 0.12, 0.18, "sawtooth", 0.075);
+  }
+
+  function playWeaknessSound() {
+    playTone(740, 0, 0.08, "triangle", 0.075);
+    playTone(988, 0.08, 0.12, "square", 0.075);
+  }
+
+  function playMissSound() {
+    playTone(260, 0, 0.08, "triangle", 0.045);
+    playTone(190, 0.08, 0.12, "triangle", 0.04);
   }
 
   function playHitSound() {
@@ -4706,6 +5342,29 @@
   function playItemSound() {
     playTone(660, 0, 0.1, "square", 0.065);
     playTone(880, 0.1, 0.12, "square", 0.07);
+  }
+
+  function playChestSound() {
+    playTone(392, 0, 0.08, "square", 0.065);
+    playTone(784, 0.08, 0.11, "square", 0.075);
+    playTone(1175, 0.2, 0.18, "triangle", 0.06);
+  }
+
+  function playSaveSound() {
+    playTone(440, 0, 0.08, "sine", 0.055);
+    playTone(660, 0.08, 0.1, "sine", 0.06);
+    playTone(880, 0.2, 0.12, "triangle", 0.055);
+  }
+
+  function playStatusSound() {
+    playTone(180, 0, 0.1, "sawtooth", 0.045);
+    playTone(260, 0.08, 0.13, "triangle", 0.045);
+  }
+
+  function playRockBreakSound() {
+    playTone(90, 0, 0.18, "sawtooth", 0.08);
+    playTone(130, 0.12, 0.16, "square", 0.055);
+    playTone(70, 0.24, 0.2, "triangle", 0.06);
   }
 
   function playRunSound() {
@@ -4757,6 +5416,12 @@
     playTone(196, 0.58, 0.34, "triangle", 0.06);
   }
 
+  function playBossPhaseSound() {
+    playTone(98, 0, 0.18, "sawtooth", 0.08);
+    playTone(196, 0.16, 0.2, "sawtooth", 0.075);
+    playTone(392, 0.36, 0.22, "square", 0.065);
+  }
+
   function playChapterClearSound() {
     playTone(523, 0, 0.18, "square", 0.075);
     playTone(659, 0.16, 0.18, "square", 0.075);
@@ -4784,9 +5449,15 @@
     showFieldMessage("", `力尽きた。町で目を覚ました。\n${lostGold}Gを失った。`);
   }
 
-  function saveGame() {
+  async function saveGame() {
     if (state.mode === "battle") {
       showFieldMessage("", "戦闘中はセーブできない。");
+      return;
+    }
+
+    const willSave = await ask("セーブ", buildSaveSummary(), { yes: "セーブ", no: "戻る" });
+    if (!willSave) {
+      await say("セーブ", "保存せずに戻った。");
       return;
     }
 
@@ -4801,7 +5472,9 @@
       defeatedBosses: state.defeatedBosses,
       story: ensureStory(),
       log: state.log,
+      battleLog: [],
       steps: state.steps,
+      settings: ensureSettings(),
       tutorial: {
         done: Boolean(state.tutorial?.done),
       },
@@ -4810,11 +5483,21 @@
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
       setBattleMessage("セーブした。");
+      playSaveSound();
       showFieldMessage("", "セーブした。");
     } catch (error) {
       showFieldMessage("", "セーブに失敗した。");
       console.error(error);
     }
+  }
+
+  function buildSaveSummary() {
+    return [
+      "この内容でセーブしますか？",
+      `場所: ${currentMap().name}`,
+      `Lv ${state.player.level} / HP ${state.player.hp}/${state.player.maxHp} / MP ${state.player.mp}/${state.player.maxMp}`,
+      `目的: ${currentQuestTitle()}`,
+    ].join("\n");
   }
 
   function loadGame(options = {}) {
@@ -4907,6 +5590,9 @@
         gold: payload.player.gold,
         status: {
           poison: Boolean(payload.player.status?.poison),
+          sleep: Math.max(0, Math.floor(Number(payload.player.status?.sleep) || 0)),
+          paralysis: Math.max(0, Math.floor(Number(payload.player.status?.paralysis) || 0)),
+          burn: Math.max(0, Math.floor(Number(payload.player.status?.burn) || 0)),
         },
         equipment: loadedEquipment,
         gear: loadedGear,
@@ -4917,7 +5603,11 @@
       defeatedBosses: payload.defeatedBosses || {},
       story: loadedStory,
       log: Array.isArray(payload.log) ? payload.log.slice(0, 8) : ["ロードした。"],
+      battleLog: [],
       steps: payload.steps || 0,
+      settings: {
+        questBadgeVisible: payload.settings?.questBadgeVisible !== false,
+      },
       tutorial: {
         done: payload.tutorial ? Boolean(payload.tutorial.done) : true,
         active: false,
@@ -4934,6 +5624,7 @@
     ensureInventory();
     normalizePlayerStatus();
     ensureStory();
+    ensureSettings();
     markVisitedMap(state.mapId);
     hideTitleScreen();
     setBattleMessage("ロードした。");
@@ -4945,7 +5636,7 @@
 
   function isValidSave(payload) {
     const version = payload?.version ?? payload?.saveVersion;
-    if (!payload || ![1, 2, 3, 4, 5, 6, 7].includes(version)) {
+    if (!payload || ![1, 2, 3, 4, 5, 6, 7, 8].includes(version)) {
       return false;
     }
 
@@ -4994,10 +5685,53 @@
 
     map.entities.forEach((entity) => drawEntity(entity, camera));
     drawPlayer(state.player.x - camera.x, state.player.y - camera.y);
+    drawMapAtmosphere();
+    if (state.mode !== "battle" && activeEffect) {
+      drawFieldEffect(activeEffect);
+    }
 
     if (state.mode === "battle") {
       drawBattleOverlay(state.battle.enemy);
     }
+  }
+
+  function drawMapAtmosphere() {
+    if (state.mode === "battle") {
+      return;
+    }
+
+    if (["forest", "forestDepth"].includes(state.mapId)) {
+      ctx.fillStyle = "rgba(20, 55, 32, 0.12)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else if (["cave", "caveB1", "caveDeep"].includes(state.mapId)) {
+      ctx.fillStyle = "rgba(10, 12, 18, 0.2)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else if (state.mapId === "portTown") {
+      ctx.fillStyle = "rgba(95, 148, 174, 0.08)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (timeOfDay() === "night" && !["cave", "caveB1", "caveDeep", "villageHouse"].includes(state.mapId)) {
+      ctx.fillStyle = "rgba(12, 22, 42, 0.26)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function drawFieldEffect(effect) {
+    const progress = effect.progress;
+    const alpha = 1 - progress;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = effect.color || "#fff5c2";
+    for (let index = 0; index < 12; index += 1) {
+      const x = canvas.width / 2 + Math.cos(index * 0.53) * progress * 130;
+      const y = canvas.height / 2 + Math.sin(index * 0.73) * progress * 90;
+      ctx.fillRect(x - 4, y - 4, 8, 8);
+    }
+    ctx.font = "bold 24px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(effect.label || "", canvas.width / 2, canvas.height / 2 - progress * 42);
+    ctx.restore();
   }
 
   function drawTile(tile, x, y) {
@@ -5042,12 +5776,17 @@
       ctx.fillStyle = "#5b4a3f";
       ctx.fillRect(px, py + 14, TILE_SIZE, 3);
       ctx.fillRect(px + 14, py, 3, TILE_SIZE);
-    } else if (tile === "R") {
+    } else if (tile === "R" || tile === "H") {
       ctx.fillStyle = "#3b3a42";
       ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
       ctx.fillStyle = "#57545f";
       ctx.fillRect(px + 2, py + 5, 11, 7);
       ctx.fillRect(px + 17, py + 18, 12, 8);
+      if (tile === "H") {
+        ctx.fillStyle = "rgba(217, 209, 195, 0.18)";
+        ctx.fillRect(px + 11, py + 4, 3, 24);
+        ctx.fillRect(px + 17, py + 10, 8, 3);
+      }
     } else if (tile === "M") {
       ctx.fillStyle = "#68685d";
       ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
@@ -5112,8 +5851,9 @@
       return;
     }
 
-    const screenX = entity.x - camera.x;
-    const screenY = entity.y - camera.y;
+    const position = entityPosition(entity);
+    const screenX = position.x - camera.x;
+    const screenY = position.y - camera.y;
     if (screenX < 0 || screenX >= VIEW_COLS || screenY < 0 || screenY >= VIEW_ROWS) {
       return;
     }
@@ -5136,6 +5876,17 @@
 
     if (entity.kind === "obstacle") {
       drawObstacle(entity, screenX, screenY);
+      return;
+    }
+
+    if (entity.kind === "inspect") {
+      drawInspectObject(entity, screenX, screenY);
+      drawNameplate(entity.name, screenX, screenY);
+      return;
+    }
+
+    if (entity.kind === "breakableRock") {
+      drawBreakableRock(entity, screenX, screenY);
       return;
     }
 
@@ -5176,6 +5927,46 @@
     ctx.fillRect(px + 4, py + 8, 24, 20);
     ctx.fillStyle = "#747365";
     ctx.fillRect(px + 8, py + 5, 16, 8);
+  }
+
+  function drawInspectObject(entity, x, y) {
+    const px = x * TILE_SIZE;
+    const py = y * TILE_SIZE;
+    if (entity.name?.includes("井戸")) {
+      ctx.fillStyle = "#5d5f66";
+      ctx.fillRect(px + 5, py + 12, 22, 16);
+      ctx.fillStyle = "#30343c";
+      ctx.fillRect(px + 7, py + 14, 18, 10);
+      ctx.fillStyle = "#7fb1c7";
+      ctx.fillRect(px + 10, py + 17, 12, 4);
+      return;
+    }
+
+    ctx.fillStyle = "#6e6b62";
+    ctx.fillRect(px + 7, py + 8, 18, 22);
+    ctx.fillStyle = "#b8ae8e";
+    ctx.fillRect(px + 10, py + 12, 12, 3);
+    ctx.fillRect(px + 11, py + 18, 10, 3);
+  }
+
+  function drawBreakableRock(entity, x, y) {
+    const px = x * TILE_SIZE;
+    const py = y * TILE_SIZE;
+    ctx.fillStyle = "rgba(35, 45, 38, 0.22)";
+    ctx.fillRect(px + 5, py + 26, 22, 4);
+    ctx.fillStyle = "#777569";
+    ctx.fillRect(px + 5, py + 12, 22, 16);
+    ctx.fillStyle = "#9b9888";
+    ctx.fillRect(px + 9, py + 7, 15, 9);
+    ctx.strokeStyle = "#3a3935";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px + 11, py + 10);
+    ctx.lineTo(px + 16, py + 17);
+    ctx.lineTo(px + 13, py + 25);
+    ctx.moveTo(px + 20, py + 14);
+    ctx.lineTo(px + 17, py + 22);
+    ctx.stroke();
   }
 
   function drawLever(entity, x, y) {
@@ -5313,8 +6104,15 @@
 
   function drawBattleOverlay(enemy) {
     const effect = activeEffect;
-    const battleShake = effect?.type === "enemyAttack"
-      ? Math.sin(effect.progress * Math.PI * 12) * 7 * (1 - effect.progress)
+    const shakeStrength = effect?.type === "enemyAttack"
+      ? 7
+      : ["criticalSlash", "bossIntro", "bossDefeat"].includes(effect?.type)
+        ? 10
+        : effect?.type === "statusDamage"
+          ? 5
+          : 0;
+    const battleShake = shakeStrength
+      ? Math.sin(effect.progress * Math.PI * 12) * shakeStrength * (1 - effect.progress)
       : 0;
     const centerX = canvas.width / 2 + battleShake;
     const enemyY = 142;
@@ -5446,9 +6244,12 @@
   function drawBattleMessage(text) {
     drawRetroWindow(18, 268, 316, 92);
     ctx.fillStyle = "#fffaf1";
-    ctx.font = "bold 16px sans-serif";
+    ctx.font = "bold 14px sans-serif";
     ctx.textAlign = "left";
-    wrapText(text, 36, 302, 280, 22);
+    const messages = state.mode === "battle" && Array.isArray(state.battleLog) && state.battleLog.length
+      ? state.battleLog.slice(0, 3).reverse()
+      : [text];
+    wrapText(messages.join("\n"), 36, 292, 280, 20);
   }
 
   function drawBattleCommandWindow() {
@@ -5502,6 +6303,14 @@
     let lineY = y;
 
     [...text].forEach((character) => {
+      if (character === "\n") {
+        if (line) {
+          ctx.fillText(line, x, lineY);
+        }
+        line = "";
+        lineY += lineHeight;
+        return;
+      }
       const testLine = line + character;
       if (ctx.measureText(testLine).width > maxWidth && line) {
         ctx.fillText(line, x, lineY);
@@ -5518,7 +6327,7 @@
   }
 
   function drawBattleEffect(effect, centerX, centerY) {
-    if (effect.type === "slash") {
+    if (effect.type === "slash" || effect.type === "criticalSlash") {
       drawSlashEffect(effect, centerX, centerY);
     } else if (effect.type === "enemyAttack") {
       drawEnemyAttackEffect(effect, centerX, centerY);
@@ -5526,10 +6335,16 @@
       drawHealEffect(effect, centerX, centerY);
     } else if (effect.type === "magicAttack") {
       drawMagicAttackEffect(effect, centerX, centerY);
+    } else if (effect.type === "weakness") {
+      drawWeaknessEffect(effect, centerX, centerY);
+    } else if (effect.type === "statusDamage" || effect.type === "statusBurst") {
+      drawStatusEffect(effect, centerX, centerY);
     } else if (effect.type === "run") {
       drawRunEffect(effect, centerX, centerY);
     } else if (effect.type === "defeat") {
       drawDefeatEffect(effect, centerX, centerY);
+    } else if (effect.type === "bossIntro" || effect.type === "bossDefeat") {
+      drawBossEventEffect(effect, centerX, centerY);
     }
   }
 
@@ -5539,19 +6354,20 @@
     const travel = easeOutCubic(progress);
     const startX = centerX - 86 + travel * 130;
     const startY = centerY - 67 + travel * 38;
+    const critical = effect.type === "criticalSlash";
 
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.lineCap = "square";
-    ctx.strokeStyle = "#fff7d6";
-    ctx.lineWidth = 8;
+    ctx.strokeStyle = critical ? "#fff5c2" : "#fff7d6";
+    ctx.lineWidth = critical ? 12 : 8;
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(startX + 64, startY + 52);
     ctx.stroke();
 
-    ctx.strokeStyle = "#d43f35";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = critical ? "#f5d66b" : "#d43f35";
+    ctx.lineWidth = critical ? 5 : 3;
     ctx.beginPath();
     ctx.moveTo(startX + 8, startY + 7);
     ctx.lineTo(startX + 58, startY + 47);
@@ -5568,7 +6384,10 @@
     ctx.restore();
 
     if (progress > 0.38) {
-      drawFloatingText(`-${effect.damage}`, centerX, centerY - 56, progress, "#d43f35");
+      drawFloatingText(`-${effect.damage}`, centerX, centerY - 56, progress, critical ? "#f5d66b" : "#d43f35");
+      if (critical) {
+        drawFloatingText("CRITICAL", centerX, centerY - 96, progress, "#fff5c2");
+      }
     }
   }
 
@@ -5649,6 +6468,56 @@
     }
   }
 
+  function drawWeaknessEffect(effect, centerX, centerY) {
+    const progress = effect.progress;
+    const alpha = 1 - progress;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = "#f5d66b";
+    ctx.lineWidth = 4;
+    for (let index = 0; index < 3; index += 1) {
+      const radius = 18 + progress * (34 + index * 10);
+      ctx.beginPath();
+      ctx.arc(centerX, centerY - 10, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    drawFloatingText(effect.label || "WEAK", centerX, centerY - 80, progress, "#f5d66b");
+  }
+
+  function drawStatusEffect(effect, centerX, centerY) {
+    const progress = effect.progress;
+    const alpha = 1 - progress * 0.85;
+    const color = effect.color || "#fffaf1";
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    for (let index = 0; index < 8; index += 1) {
+      const angle = index * 0.78 + progress * 2.4;
+      const distance = 18 + progress * 58;
+      const x = centerX + Math.cos(angle) * distance;
+      const y = centerY + 48 + Math.sin(angle) * distance * 0.55;
+      ctx.fillRect(x - 4, y - 4, 8, 8);
+    }
+    ctx.restore();
+    if (effect.label) {
+      drawFloatingText(effect.label, centerX, centerY + 58, progress, color);
+    }
+  }
+
+  function drawBossEventEffect(effect, centerX, centerY) {
+    const progress = effect.progress;
+    const pulse = Math.sin(progress * Math.PI * 6) * (1 - progress);
+    ctx.save();
+    ctx.fillStyle = `rgba(184, 79, 66, ${0.28 * (1 - progress)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = effect.type === "bossDefeat" ? "#fff5c2" : "#e05a48";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(44 + pulse * 6, 28 + pulse * 4, canvas.width - 88, 186);
+    ctx.restore();
+    drawFloatingText(effect.label || "BOSS", centerX, centerY - 90, progress, effect.type === "bossDefeat" ? "#fff5c2" : "#e05a48");
+  }
+
   function drawRunEffect(effect, centerX, centerY) {
     const progress = effect.progress;
 
@@ -5722,6 +6591,20 @@
     return state.mode !== "battle" || busy || extraDisabled || !canUseTutorialChoice(choice);
   }
 
+  function renderStatusIcons(container, player = state.player) {
+    if (!container) {
+      return;
+    }
+
+    container.replaceChildren();
+    statusIconEntries(player).forEach((entry) => {
+      const icon = document.createElement("span");
+      icon.className = `status-icon ${entry.id}`;
+      icon.textContent = entry.label;
+      container.append(icon);
+    });
+  }
+
   function renderHud() {
     const player = state.player;
     const enemy = state.battle?.enemy;
@@ -5735,6 +6618,7 @@
     const herbCount = getHerbCount();
     const statusText = statusSummary(player);
     const questText = currentQuestTitle();
+    const settings = ensureSettings();
     const usableItemCount = Object.keys(TOOL_ITEMS).filter((itemId) => itemCount(itemId) > 0 && canUseToolItem(itemId)).length;
 
     updateAudioButtons();
@@ -5742,6 +6626,9 @@
     ui.mapValue.textContent = currentMap().name;
     ui.fieldMapBadge.textContent = currentMap().name;
     ui.fieldQuestBadge.textContent = questText;
+    ui.fieldQuestBadge.hidden = !settings.questBadgeVisible || isBattle;
+    ui.questToggleButton.textContent = settings.questBadgeVisible ? "目的OFF" : "目的ON";
+    ui.menuQuestToggleButton.textContent = settings.questBadgeVisible ? "目的OFF" : "目的ON";
     ui.modeValue.textContent = busy ? "演出中" : isBattle ? "戦闘中" : "探索中";
     ui.modeValue.classList.toggle("battle", isBattle);
     ui.mobileMapValue.textContent = currentMap().name;
@@ -5766,6 +6653,9 @@
     ui.statusValue.textContent = statusText;
     ui.mobileStatusValue.textContent = statusText;
     ui.touchStatusText.textContent = `状態: ${statusText}`;
+    renderStatusIcons(ui.statusIcons, player);
+    renderStatusIcons(ui.mobileStatusIcons, player);
+    renderStatusIcons(ui.touchStatusIcons, player);
     ui.equipmentValue.textContent = equipmentSummary(player);
     ui.mobileEquipmentValue.textContent = equipmentSummary(player);
     ui.hpText.textContent = `HP ${player.hp} / ${player.maxHp}`;
@@ -6135,12 +7025,14 @@
     ui.defendButton.addEventListener("click", playerDefend);
     ui.runButton.addEventListener("click", playerRun);
     ui.audioButton.addEventListener("click", handleAudioButtonClick);
+    ui.questToggleButton.addEventListener("click", toggleQuestBadge);
     ui.saveButton.addEventListener("click", saveGame);
     ui.loadButton.addEventListener("click", loadGame);
     ui.resetButton.addEventListener("click", resetGame);
     ui.menuButton.addEventListener("click", openMobileMenu);
     ui.menuCloseButton.addEventListener("click", closeMobileMenu);
     ui.menuAudioButton.addEventListener("click", handleAudioButtonClick);
+    ui.menuQuestToggleButton.addEventListener("click", toggleQuestBadge);
     document.addEventListener("click", handleAudioButtonClick);
     ui.menuSaveButton.addEventListener("click", () => runMobileMenuAction(saveGame));
     ui.menuLoadButton.addEventListener("click", () => runMobileMenuAction(loadGame));
